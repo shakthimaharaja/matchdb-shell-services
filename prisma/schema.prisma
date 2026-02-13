@@ -1,0 +1,58 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// SQLite does not support enums — using String fields instead.
+// UserType: "candidate" | "vendor" | "admin"
+// Plan: "free" | "pro" | "enterprise"
+// SubStatus: "active" | "inactive" | "trialing" | "canceled" | "past_due"
+
+model User {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  password      String
+  firstName     String?
+  lastName      String?
+  userType      String         @default("candidate")
+  visibility    String         @default("all")
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  subscription  Subscription?
+  refreshTokens RefreshToken[]
+
+  @@map("users")
+}
+
+model Subscription {
+  id               String    @id @default(uuid())
+  userId           String    @unique
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stripeCustomerId String?   @unique
+  stripePriceId    String?
+  stripeSubId      String?
+  plan             String    @default("free")
+  status           String    @default("inactive")
+  currentPeriodEnd DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@map("subscriptions")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@map("refresh_tokens")
+}
