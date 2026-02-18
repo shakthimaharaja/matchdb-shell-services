@@ -16,7 +16,7 @@ const registerSchema = z.object({
   firstName: z.string().optional(),
   lastName: z.string().optional(),
   userType: z.enum(["candidate", "vendor"]),
-  visibility: z.enum(["all", "c2c", "w2", "c2h", "fulltime"]).optional(),
+  membershipConfig: z.string().optional(), // JSON string: {"contract":["c2c","c2h"]}
 });
 
 const loginSchema = z.object({
@@ -53,17 +53,25 @@ function userResponse(
     firstName: string | null;
     lastName: string | null;
     userType: string;
-    visibility: string;
+    membershipConfig: string | null;
   },
   plan: string,
 ) {
+  let membership_config: Record<string, string[]> | null = null;
+  if (user.membershipConfig) {
+    try {
+      membership_config = JSON.parse(user.membershipConfig);
+    } catch {
+      /* ignore */
+    }
+  }
   return {
     id: user.id,
     email: user.email,
     first_name: user.firstName || "",
     last_name: user.lastName || "",
     user_type: user.userType,
-    visibility: user.visibility || "all",
+    membership_config,
     plan,
   };
 }
@@ -94,7 +102,7 @@ export async function register(
         firstName: body.firstName,
         lastName: body.lastName,
         userType: body.userType,
-        visibility: body.visibility || "all",
+        membershipConfig: body.membershipConfig || null,
         subscription: {
           create: { plan: "free", status: "active" },
         },
@@ -120,12 +128,10 @@ export async function register(
     });
   } catch (err) {
     if (err instanceof z.ZodError) {
-      res
-        .status(400)
-        .json({
-          error: err.errors[0]?.message || "Validation error",
-          details: err.errors,
-        });
+      res.status(400).json({
+        error: err.errors[0]?.message || "Validation error",
+        details: err.errors,
+      });
       return;
     }
     next(err);
@@ -272,6 +278,23 @@ export async function logout(
       });
     }
     res.json({ message: "Logged out successfully" });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function deleteAccount(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = req.user!.userId;
+
+    // Cascade-delete will remove Subscription + RefreshTokens automatically
+    await prisma.user.delete({ where: { id: userId } });
+
+    res.json({ message: "Account deleted permanently" });
   } catch (err) {
     next(err);
   }
