@@ -195,18 +195,18 @@ All passwords: `Password1!`
 
 ### Candidates (10)
 
-| Email              | Plan       | Username             | Membership Config      |
-| ------------------ | ---------- | -------------------- | ---------------------- |
+| Email              | Plan       | Username             | Membership Config     |
+| ------------------ | ---------- | -------------------- | --------------------- |
 | alice@example.com  | pro        | alice-johnson-3458c1 | FT (w2, c2h), C (c2c) |
 | bob@example.com    | free       | bob-smith-b444f8     | FT (w2), C (c2c, c2h) |
 | carol@example.com  | free       | carol-davis-3f7616   | C (c2c, c2h, w2)      |
-| grace@devmail.com  | pro        | grace-lee-a1b2c3     | FT (w2)                |
-| hank@coderz.io     | free       | hank-patel-a1b2c3    | C (c2h, w2)            |
-| irene@webdev.com   | enterprise | irene-garcia-a1b2c3  | FT (w2, c2h)           |
-| jack@stackhire.com | free       | jack-thompson-a1b2c3 | FT (w2, c2h)           |
-| karen@datapro.net  | pro        | karen-white-a1b2c3   | FT (w2)                |
-| leo@cloudops.dev   | free       | leo-martinez-a1b2c3  | FT (w2), C (c2h)       |
-| mia@appforge.io    | pro        | mia-robinson-a1b2c3  | C (c2c), FT (w2)       |
+| grace@devmail.com  | pro        | grace-lee-a1b2c3     | FT (w2)               |
+| hank@coderz.io     | free       | hank-patel-a1b2c3    | C (c2h, w2)           |
+| irene@webdev.com   | enterprise | irene-garcia-a1b2c3  | FT (w2, c2h)          |
+| jack@stackhire.com | free       | jack-thompson-a1b2c3 | FT (w2, c2h)          |
+| karen@datapro.net  | pro        | karen-white-a1b2c3   | FT (w2)               |
+| leo@cloudops.dev   | free       | leo-martinez-a1b2c3  | FT (w2), C (c2h)      |
+| mia@appforge.io    | pro        | mia-robinson-a1b2c3  | C (c2c), FT (w2)      |
 
 All candidates have `hasPurchasedVisibility: true` for testing.
 
