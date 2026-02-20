@@ -1,12 +1,14 @@
-import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import passport from 'passport';
-import { env } from './config/env';
-import './config/passport'; // registers Google OAuth strategy (side-effect)
-import authRoutes from './routes/auth.routes';
-import paymentsRoutes from './routes/payments.routes';
-import { errorHandler, notFound } from './middleware/error.middleware';
+import express from "express";
+import cors from "cors";
+import helmet from "helmet";
+import passport from "passport";
+import swaggerUi from "swagger-ui-express";
+import { env } from "./config/env";
+import "./config/passport"; // registers Google OAuth strategy (side-effect)
+import { swaggerSpec } from "./config/swagger";
+import authRoutes from "./routes/auth.routes";
+import paymentsRoutes from "./routes/payments.routes";
+import { errorHandler, notFound } from "./middleware/error.middleware";
 
 const app = express();
 
@@ -14,31 +16,47 @@ const app = express();
 app.use(helmet());
 
 // CORS
-app.use(cors({
-  origin: env.CORS_ORIGINS,
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
+app.use(
+  cors({
+    origin: env.CORS_ORIGINS,
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  }),
+);
 
 // Passport (stateless — no session middleware needed)
 app.use(passport.initialize());
 
 // Stripe webhook must come BEFORE express.json() (needs raw body)
 // It is self-contained in payments.routes with its own raw body parser
-app.use('/api/payments', paymentsRoutes);
+app.use("/api/payments", paymentsRoutes);
 
 // JSON body parser for all other routes
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Routes
-app.use('/api/auth', authRoutes);
+app.use("/api/auth", authRoutes);
 
 // Health check
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', service: 'matchdb-shell-services', env: env.NODE_ENV });
+app.get("/health", (_req, res) => {
+  res.json({
+    status: "ok",
+    service: "matchdb-shell-services",
+    env: env.NODE_ENV,
+  });
 });
+
+// Swagger docs
+app.use(
+  "/api-docs",
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerSpec, {
+    customCss: ".swagger-ui .topbar { display: none }",
+    customSiteTitle: "MatchDB Shell Services — API Docs",
+  }),
+);
 
 // 404 + error handler
 app.use(notFound);

@@ -24,11 +24,12 @@ matchdb-shell-services/
 │   └── schema.prisma        # User, Subscription, RefreshToken, CandidatePayment models
 ├── src/
 │   ├── index.ts              # Entry point — starts Express server
-│   ├── app.ts                # Express app setup (routes, middleware)
+│   ├── app.ts                # Express app setup (routes, middleware, Swagger)
 │   ├── config/
 │   │   ├── env.ts            # Environment variable loading & validation
 │   │   ├── prisma.ts         # Prisma client singleton
-│   │   └── passport.ts       # Google OAuth strategy (graceful degradation)
+│   │   ├── passport.ts       # Google OAuth strategy (graceful degradation)
+│   │   └── swagger.ts        # ★ OpenAPI 3.0 spec (all auth + payments endpoints)
 │   ├── controllers/
 │   │   ├── auth.controller.ts      # Register, login, refresh, verify, logout, delete, OAuth
 │   │   └── payments.controller.ts  # Stripe checkout, webhook, portal, candidate packages
@@ -55,27 +56,27 @@ matchdb-shell-services/
 
 ### Auth
 
-| Method | Path                        | Auth | Description                           |
-| ------ | --------------------------- | ---- | ------------------------------------- |
-| POST   | `/api/auth/register`        | No   | Create a new user (generates username)|
-| POST   | `/api/auth/login`           | No   | Login, returns JWT tokens             |
-| POST   | `/api/auth/refresh`         | No   | Refresh access token                  |
-| GET    | `/api/auth/verify`          | Yes  | Get current user profile              |
-| POST   | `/api/auth/logout`          | Yes  | Revoke refresh token                  |
-| DELETE | `/api/auth/account`         | Yes  | Permanently delete account (cascading)|
+| Method | Path                        | Auth | Description                                           |
+| ------ | --------------------------- | ---- | ----------------------------------------------------- |
+| POST   | `/api/auth/register`        | No   | Create a new user (generates username)                |
+| POST   | `/api/auth/login`           | No   | Login, returns JWT tokens                             |
+| POST   | `/api/auth/refresh`         | No   | Refresh access token                                  |
+| GET    | `/api/auth/verify`          | Yes  | Get current user profile                              |
+| POST   | `/api/auth/logout`          | Yes  | Revoke refresh token                                  |
+| DELETE | `/api/auth/account`         | Yes  | Permanently delete account (cascading)                |
 | GET    | `/api/auth/google`          | No   | Initiate Google OAuth (`?userType=candidate\|vendor`) |
-| GET    | `/api/auth/google/callback` | No   | Google OAuth callback → JWT + redirect|
+| GET    | `/api/auth/google/callback` | No   | Google OAuth callback → JWT + redirect                |
 
 ### Payments
 
-| Method | Path                              | Auth | Description                        |
-| ------ | --------------------------------- | ---- | ---------------------------------- |
-| POST   | `/api/payments/checkout`          | Yes  | Create Stripe subscription checkout|
-| POST   | `/api/payments/webhook`           | No   | Stripe webhook receiver            |
-| POST   | `/api/payments/portal`            | Yes  | Create Stripe billing portal       |
-| GET    | `/api/payments/candidate-packages`| No   | List candidate visibility packages |
-| POST   | `/api/payments/candidate-checkout`| Yes  | One-time Stripe checkout for candidate visibility |
-| GET    | `/health`                         | No   | Health check                       |
+| Method | Path                               | Auth | Description                                       |
+| ------ | ---------------------------------- | ---- | ------------------------------------------------- |
+| POST   | `/api/payments/checkout`           | Yes  | Create Stripe subscription checkout               |
+| POST   | `/api/payments/webhook`            | No   | Stripe webhook receiver                           |
+| POST   | `/api/payments/portal`             | Yes  | Create Stripe billing portal                      |
+| GET    | `/api/payments/candidate-packages` | No   | List candidate visibility packages                |
+| POST   | `/api/payments/candidate-checkout` | Yes  | One-time Stripe checkout for candidate visibility |
+| GET    | `/health`                          | No   | Health check                                      |
 
 ## Data Models
 
@@ -95,6 +96,7 @@ Tracks one-time visibility package purchases:
 ### Membership Config
 
 Aggregated from all completed `CandidatePayment` records:
+
 ```json
 { "contract": ["c2c", "c2h", "w2"], "full_time": ["w2", "direct_hire"] }
 ```
@@ -171,32 +173,32 @@ All passwords: `Password1!`
 
 ### Candidates (10)
 
-| Email              | Plan       | Username             | Membership Config        |
-| ------------------ | ---------- | -------------------- | ------------------------ |
-| alice@example.com  | pro        | alice-johnson-3458c1 | FT (w2, c2h), C (c2c)   |
-| bob@example.com    | free       | bob-smith-b444f8     | FT (w2), C (c2c, c2h)   |
-| carol@example.com  | free       | carol-davis-3f7616   | C (c2c, c2h, w2)        |
-| grace@devmail.com  | pro        | grace-lee-a1b2c3     | FT (w2)                  |
-| hank@coderz.io     | free       | hank-patel-a1b2c3    | C (c2h, w2)              |
-| irene@webdev.com   | enterprise | irene-garcia-a1b2c3  | FT (w2, c2h)             |
-| jack@stackhire.com | free       | jack-thompson-a1b2c3 | FT (w2, c2h)             |
-| karen@datapro.net  | pro        | karen-white-a1b2c3   | FT (w2)                  |
-| leo@cloudops.dev   | free       | leo-martinez-a1b2c3  | FT (w2), C (c2h)         |
-| mia@appforge.io    | pro        | mia-robinson-a1b2c3  | C (c2c), FT (w2)         |
+| Email              | Plan       | Username             | Membership Config     |
+| ------------------ | ---------- | -------------------- | --------------------- |
+| alice@example.com  | pro        | alice-johnson-3458c1 | FT (w2, c2h), C (c2c) |
+| bob@example.com    | free       | bob-smith-b444f8     | FT (w2), C (c2c, c2h) |
+| carol@example.com  | free       | carol-davis-3f7616   | C (c2c, c2h, w2)      |
+| grace@devmail.com  | pro        | grace-lee-a1b2c3     | FT (w2)               |
+| hank@coderz.io     | free       | hank-patel-a1b2c3    | C (c2h, w2)           |
+| irene@webdev.com   | enterprise | irene-garcia-a1b2c3  | FT (w2, c2h)          |
+| jack@stackhire.com | free       | jack-thompson-a1b2c3 | FT (w2, c2h)          |
+| karen@datapro.net  | pro        | karen-white-a1b2c3   | FT (w2)               |
+| leo@cloudops.dev   | free       | leo-martinez-a1b2c3  | FT (w2), C (c2h)      |
+| mia@appforge.io    | pro        | mia-robinson-a1b2c3  | C (c2c), FT (w2)      |
 
 All candidates have `hasPurchasedVisibility: true` for testing.
 
 ### Vendors (7)
 
-| Email               | Plan       | Username               |
-| ------------------- | ---------- | ---------------------- |
-| dan@techcorp.com    | pro        | dan-brown-d8c0ac       |
-| eve@startup.io      | enterprise | eve-wilson-b25adc      |
-| frank@agency.com    | free       | frank-miller-379a35    |
-| nina@recruit.co     | pro        | nina-chen-a1b2c3       |
-| oscar@hiringlab.com | enterprise | oscar-nguyen-a1b2c3    |
-| paula@talentedge.io | pro        | paula-kim-a1b2c3       |
-| quinn@staffplus.com | free       | quinn-adams-a1b2c3     |
+| Email               | Plan       | Username            |
+| ------------------- | ---------- | ------------------- |
+| dan@techcorp.com    | pro        | dan-brown-d8c0ac    |
+| eve@startup.io      | enterprise | eve-wilson-b25adc   |
+| frank@agency.com    | free       | frank-miller-379a35 |
+| nina@recruit.co     | pro        | nina-chen-a1b2c3    |
+| oscar@hiringlab.com | enterprise | oscar-nguyen-a1b2c3 |
+| paula@talentedge.io | pro        | paula-kim-a1b2c3    |
+| quinn@staffplus.com | free       | quinn-adams-a1b2c3  |
 
 ## Available Scripts
 
@@ -208,3 +210,7 @@ All candidates have `hasPurchasedVisibility: true` for testing.
 | `npm run prisma:generate` | Regenerate Prisma client          |
 | `npm run prisma:migrate`  | Run database migrations           |
 | `npm run prisma:studio`   | Open Prisma Studio GUI            |
+
+## API Documentation (Swagger)
+
+Interactive API docs are available at **http://localhost:8000/api-docs** when the server is running. The OpenAPI 3.0 spec is defined inline in `src/config/swagger.ts` and covers all auth and payments endpoints with request/response schemas.
