@@ -2,6 +2,8 @@
 
 Authentication, OAuth, Payments & Membership backend for the MatchDB staffing platform.
 
+---
+
 ## Tech Stack
 
 | Layer      | Technology                                       |
@@ -16,20 +18,22 @@ Authentication, OAuth, Payments & Membership backend for the MatchDB staffing pl
 | Validation | Zod                                              |
 | Security   | Helmet, CORS                                     |
 
+---
+
 ## Project Structure
 
 ```
 matchdb-shell-services/
 ├── prisma/
-│   └── schema.prisma        # User, Subscription, RefreshToken, CandidatePayment models
+│   └── schema.prisma          # User, Subscription, RefreshToken, CandidatePayment models
 ├── src/
-│   ├── index.ts              # Entry point — starts Express server
-│   ├── app.ts                # Express app setup (routes, middleware, Swagger)
+│   ├── index.ts               # Entry point — starts Express server
+│   ├── app.ts                 # Express app (routes, middleware, Swagger)
 │   ├── config/
-│   │   ├── env.ts            # Environment variable loading & validation
-│   │   ├── prisma.ts         # Prisma client singleton
-│   │   ├── passport.ts       # Google OAuth strategy (graceful degradation)
-│   │   └── swagger.ts        # ★ OpenAPI 3.0 spec (all auth + payments endpoints)
+│   │   ├── env.ts             # Environment variable loading & validation
+│   │   ├── prisma.ts          # Prisma client singleton
+│   │   ├── passport.ts        # Google OAuth strategy (graceful degradation)
+│   │   └── swagger.ts         # OpenAPI 3.0 spec (all endpoints)
 │   ├── controllers/
 │   │   ├── auth.controller.ts      # Register, login, refresh, verify, logout, delete, OAuth
 │   │   └── payments.controller.ts  # Stripe checkout, webhook, portal, candidate packages
@@ -42,15 +46,17 @@ matchdb-shell-services/
 │   ├── services/
 │   │   ├── jwt.service.ts          # Token sign / verify helpers
 │   │   ├── sendgrid.service.ts     # Email dispatch (welcome email on register)
-│   │   └── stripe.service.ts       # Stripe customer + subscription + candidate pkg helpers
+│   │   └── stripe.service.ts       # Stripe customer, subscription & candidate pkg helpers
 │   └── types/
 │       └── express.d.ts            # Express.User augmentation for req.user typing
-├── seed.ts                   # Create demo users (10 candidates + 7 vendors)
+├── seed.ts                    # Create demo users (10 candidates + 7 vendors)
 ├── env/
-│   └── .env.development      # Local env vars (create from template below)
+│   └── .env.development       # Local env vars (create from template below)
 ├── package.json
 └── tsconfig.json
 ```
+
+---
 
 ## API Endpoints
 
@@ -78,20 +84,26 @@ matchdb-shell-services/
 | POST   | `/api/payments/candidate-checkout` | Yes  | One-time Stripe checkout for candidate visibility |
 | GET    | `/health`                          | No   | Health check                                      |
 
+---
+
 ## Data Models
 
 ### User
 
-`id`, `email`, `password?`, `googleId?`, `firstName`, `lastName`, `username` (unique URL slug), `userType` (candidate/vendor), `membershipConfig?` (JSON), `hasPurchasedVisibility`, `isActive`
+`id`, `email`, `password?`, `googleId?`, `firstName`, `lastName`, `username` (unique URL slug), `userType` (candidate / vendor / admin), `membershipConfig?` (JSON), `hasPurchasedVisibility`, `isActive`
 
 ### Subscription
 
-`plan` (free/pro/enterprise), `status`, `stripeCustomerId?`, `stripeSubscriptionId?`
+`plan` (free / basic / pro / pro_plus), `status`, `stripeCustomerId?`, `stripeSubscriptionId?`, `stripePriceId?`, `currentPeriodEnd?`
+
+### RefreshToken
+
+`token`, `userId`, `expiresAt`, `revoked`
 
 ### CandidatePayment
 
 Tracks one-time visibility package purchases:
-`stripeSessionId`, `stripePaymentIntentId?`, `packageType` (base/subdomain_addon/single_domain_bundle/full_bundle), `domain?`, `subdomains` (JSON array), `amountCents`, `status` (pending/completed/failed)
+`stripeSessionId`, `stripePaymentIntentId?`, `packageType` (base / subdomain_addon / single_domain_bundle / full_bundle), `domain?`, `subdomains` (JSON array), `amountCents`, `status` (pending / completed / failed)
 
 ### Membership Config
 
@@ -101,8 +113,10 @@ Aggregated from all completed `CandidatePayment` records:
 { "contract": ["c2c", "c2h", "w2"], "full_time": ["w2", "direct_hire"] }
 ```
 
-**Contract subdomains:** `c2c`, `c2h`, `w2`, `1099`  
+**Contract subdomains:** `c2c`, `c2h`, `w2`, `1099`
 **Full-time subdomains:** `c2h`, `w2`, `direct_hire`, `salary`
+
+---
 
 ## Google OAuth
 
@@ -115,10 +129,37 @@ Aggregated from all completed `CandidatePayment` records:
 
 Each user gets a unique URL-safe slug: `{firstName}-{lastName}-{idPrefix}` (e.g., `alice-johnson-3458c1`). Used for shareable public profile URLs.
 
-## Prerequisites
+---
+
+## Getting Started
+
+### Prerequisites
 
 - **Node.js** ≥ 18
 - **npm** ≥ 9
+
+### Install & Run
+
+```bash
+# 1. Install dependencies
+npm install
+
+# 2. Generate Prisma client
+npx prisma generate
+
+# 3. Create / migrate the SQLite database
+npx prisma migrate dev
+
+# 4. Seed demo users (password for all: Password1!)
+npx tsx seed.ts
+
+# 5. Start the dev server (hot-reload)
+npm run dev
+```
+
+The server starts on **http://localhost:8000**.
+
+---
 
 ## Environment Variables
 
@@ -146,26 +187,7 @@ CORS_ORIGINS=http://localhost:3000,http://localhost:4000
 CLIENT_URL=http://localhost:3000
 ```
 
-## Getting Started
-
-```bash
-# 1. Install dependencies
-npm install
-
-# 2. Generate Prisma client
-npx prisma generate
-
-# 3. Create / migrate the SQLite database
-npx prisma migrate dev
-
-# 4. Seed demo users (password for all: Password1!)
-npx tsx seed.ts
-
-# 5. Start the dev server (hot-reload)
-npm run dev
-```
-
-The server starts on **http://localhost:8000**.
+---
 
 ## Seeded Accounts
 
@@ -173,18 +195,18 @@ All passwords: `Password1!`
 
 ### Candidates (10)
 
-| Email              | Plan       | Username             | Membership Config     |
-| ------------------ | ---------- | -------------------- | --------------------- |
+| Email              | Plan       | Username             | Membership Config      |
+| ------------------ | ---------- | -------------------- | ---------------------- |
 | alice@example.com  | pro        | alice-johnson-3458c1 | FT (w2, c2h), C (c2c) |
 | bob@example.com    | free       | bob-smith-b444f8     | FT (w2), C (c2c, c2h) |
 | carol@example.com  | free       | carol-davis-3f7616   | C (c2c, c2h, w2)      |
-| grace@devmail.com  | pro        | grace-lee-a1b2c3     | FT (w2)               |
-| hank@coderz.io     | free       | hank-patel-a1b2c3    | C (c2h, w2)           |
-| irene@webdev.com   | enterprise | irene-garcia-a1b2c3  | FT (w2, c2h)          |
-| jack@stackhire.com | free       | jack-thompson-a1b2c3 | FT (w2, c2h)          |
-| karen@datapro.net  | pro        | karen-white-a1b2c3   | FT (w2)               |
-| leo@cloudops.dev   | free       | leo-martinez-a1b2c3  | FT (w2), C (c2h)      |
-| mia@appforge.io    | pro        | mia-robinson-a1b2c3  | C (c2c), FT (w2)      |
+| grace@devmail.com  | pro        | grace-lee-a1b2c3     | FT (w2)                |
+| hank@coderz.io     | free       | hank-patel-a1b2c3    | C (c2h, w2)            |
+| irene@webdev.com   | enterprise | irene-garcia-a1b2c3  | FT (w2, c2h)           |
+| jack@stackhire.com | free       | jack-thompson-a1b2c3 | FT (w2, c2h)           |
+| karen@datapro.net  | pro        | karen-white-a1b2c3   | FT (w2)                |
+| leo@cloudops.dev   | free       | leo-martinez-a1b2c3  | FT (w2), C (c2h)       |
+| mia@appforge.io    | pro        | mia-robinson-a1b2c3  | C (c2c), FT (w2)       |
 
 All candidates have `hasPurchasedVisibility: true` for testing.
 
@@ -200,7 +222,9 @@ All candidates have `hasPurchasedVisibility: true` for testing.
 | paula@talentedge.io | pro        | paula-kim-a1b2c3    |
 | quinn@staffplus.com | free       | quinn-adams-a1b2c3  |
 
-## Available Scripts
+---
+
+## Scripts
 
 | Script                    | Description                       |
 | ------------------------- | --------------------------------- |
@@ -214,3 +238,9 @@ All candidates have `hasPurchasedVisibility: true` for testing.
 ## API Documentation (Swagger)
 
 Interactive API docs are available at **http://localhost:8000/api-docs** when the server is running. The OpenAPI 3.0 spec is defined inline in `src/config/swagger.ts` and covers all auth and payments endpoints with request/response schemas.
+
+---
+
+## License
+
+MIT
