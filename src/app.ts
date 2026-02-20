@@ -1,7 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import passport from 'passport';
 import { env } from './config/env';
+import './config/passport'; // registers Google OAuth strategy (side-effect)
 import authRoutes from './routes/auth.routes';
 import paymentsRoutes from './routes/payments.routes';
 import { errorHandler, notFound } from './middleware/error.middleware';
@@ -18,6 +20,9 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
+
+// Passport (stateless — no session middleware needed)
+app.use(passport.initialize());
 
 // Stripe webhook must come BEFORE express.json() (needs raw body)
 // It is self-contained in payments.routes with its own raw body parser

@@ -1,18 +1,14 @@
-import { Request, Response, NextFunction } from 'express';
-import { verifyAccessToken, AccessTokenPayload } from '../services/jwt.service';
+import { Request, Response, NextFunction } from "express";
+import { verifyAccessToken } from "../services/jwt.service";
 
-declare global {
-  namespace Express {
-    interface Request {
-      user?: AccessTokenPayload;
-    }
-  }
-}
-
-export function requireAuth(req: Request, res: Response, next: NextFunction): void {
+export function requireAuth(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
   const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith('Bearer ')) {
-    res.status(401).json({ error: 'Authentication required' });
+  if (!authHeader?.startsWith("Bearer ")) {
+    res.status(401).json({ error: "Authentication required" });
     return;
   }
 
@@ -21,6 +17,6 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
     req.user = verifyAccessToken(token);
     next();
   } catch {
-    res.status(401).json({ error: 'Invalid or expired token' });
+    res.status(401).json({ error: "Invalid or expired token" });
   }
 }

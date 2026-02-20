@@ -6,6 +6,7 @@ export interface AccessTokenPayload {
   email: string;
   userType: string;
   plan: string;
+  username: string;
 }
 
 export interface RefreshTokenPayload {

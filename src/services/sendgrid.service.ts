@@ -1,5 +1,5 @@
-import sgMail from '@sendgrid/mail';
-import { env } from '../config/env';
+import sgMail from "@sendgrid/mail";
+import { env } from "../config/env";
 
 if (env.SENDGRID_API_KEY) {
   sgMail.setApiKey(env.SENDGRID_API_KEY);
@@ -8,7 +8,7 @@ if (env.SENDGRID_API_KEY) {
 interface WelcomeEmailParams {
   to: string;
   firstName: string;
-  userType: 'candidate' | 'vendor' | 'admin';
+  userType: "candidate" | "vendor" | "admin";
 }
 
 interface SubscriptionEmailParams {
@@ -18,18 +18,25 @@ interface SubscriptionEmailParams {
   currentPeriodEnd: Date;
 }
 
-export async function sendWelcomeEmail({ to, firstName, userType }: WelcomeEmailParams): Promise<void> {
+export async function sendWelcomeEmail({
+  to,
+  firstName,
+  userType,
+}: WelcomeEmailParams): Promise<void> {
   if (!env.SENDGRID_API_KEY) {
     console.log(`[SendGrid] (dev) Welcome email to ${to}`);
     return;
   }
 
-  const roleText = userType === 'vendor' ? 'post jobs and find top candidates' : 'discover job opportunities that match your profile';
+  const roleText =
+    userType === "vendor"
+      ? "post jobs and find top candidates"
+      : "discover job opportunities that match your profile";
 
   await sgMail.send({
     to,
     from: { email: env.SENDGRID_FROM_EMAIL, name: env.SENDGRID_FROM_NAME },
-    subject: 'Welcome to MatchDB!',
+    subject: "Welcome to MatchDB!",
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background: linear-gradient(135deg, #1d4479 0%, #3b6fa6 100%); padding: 24px; text-align: center;">
@@ -52,7 +59,12 @@ export async function sendWelcomeEmail({ to, firstName, userType }: WelcomeEmail
   });
 }
 
-export async function sendSubscriptionActivatedEmail({ to, firstName, plan, currentPeriodEnd }: SubscriptionEmailParams): Promise<void> {
+export async function sendSubscriptionActivatedEmail({
+  to,
+  firstName,
+  plan,
+  currentPeriodEnd,
+}: SubscriptionEmailParams): Promise<void> {
   if (!env.SENDGRID_API_KEY) {
     console.log(`[SendGrid] (dev) Subscription email to ${to} — plan: ${plan}`);
     return;
@@ -74,7 +86,7 @@ export async function sendSubscriptionActivatedEmail({ to, firstName, plan, curr
             Your next billing date is <strong>${currentPeriodEnd.toLocaleDateString()}</strong>.
           </p>
           <div style="text-align: center; margin: 32px 0;">
-            <a href="${env.CLIENT_URL}/pricing" style="background: #3b6fa6; color: #fff; padding: 12px 32px; text-decoration: none; border-radius: 4px; font-weight: bold;">
+            <a href="${env.CLIENT_URL}/" style="background: #3b6fa6; color: #fff; padding: 12px 32px; text-decoration: none; border-radius: 4px; font-weight: bold;">
               Manage Subscription
             </a>
           </div>

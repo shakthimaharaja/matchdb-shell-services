@@ -9,22 +9,27 @@ datasource db {
 
 // SQLite does not support enums — using String fields instead.
 // UserType: "candidate" | "vendor" | "admin"
-// Plan: "free" | "pro" | "enterprise"
+// Plan (vendor): "free" | "basic" | "pro" | "pro_plus"
 // SubStatus: "active" | "inactive" | "trialing" | "canceled" | "past_due"
+// CandidatePayment packageType: "base" | "subdomain_addon" | "single_domain_bundle" | "full_bundle"
 
 model User {
-  id            String         @id @default(uuid())
-  email         String         @unique
-  password      String
-  firstName     String?
-  lastName      String?
-  userType         String         @default("candidate")
-  membershipConfig String?        // JSON: {"contract":["c2c","c2h"],"full_time":["w2"]} — null = all access
-  isActive         Boolean        @default(true)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  subscription  Subscription?
-  refreshTokens RefreshToken[]
+  id                     String             @id @default(uuid())
+  email                  String             @unique
+  password               String?            // nullable for Google OAuth users
+  googleId               String?            @unique
+  username               String?            @unique // URL-safe slug e.g. "alex-morgan-a1b2c3"
+  firstName              String?
+  lastName               String?
+  userType               String             @default("candidate")
+  membershipConfig       String?            // JSON: {"contract":["c2c","c2h"],"full_time":["w2"]} — null = no purchased visibility
+  hasPurchasedVisibility Boolean            @default(false) // true = candidate has paid for at least one visibility package
+  isActive               Boolean            @default(true)
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+  subscription           Subscription?
+  refreshTokens          RefreshToken[]
+  candidatePayments      CandidatePayment[]
 
   @@map("users")
 }
@@ -37,6 +42,7 @@ model Subscription {
   stripePriceId    String?
   stripeSubId      String?
   plan             String    @default("free")
+  // plan values: "free" | "basic" | "pro" | "pro_plus"
   status           String    @default("inactive")
   currentPeriodEnd DateTime?
   createdAt        DateTime  @default(now())
@@ -55,4 +61,21 @@ model RefreshToken {
   createdAt DateTime @default(now())
 
   @@map("refresh_tokens")
+}
+
+model CandidatePayment {
+  id                    String   @id @default(uuid())
+  userId                String
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stripeSessionId       String   @unique
+  stripePaymentIntentId String?
+  packageType           String   // "base" | "subdomain_addon" | "single_domain_bundle" | "full_bundle"
+  domain                String?  // "contract" | "full_time" | null (null for full_bundle)
+  subdomains            String   // JSON array e.g. ["c2c","w2"]
+  amountCents           Int      // amount paid in cents
+  status                String   @default("pending") // "pending" | "completed"
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@map("candidate_payments")
 }
