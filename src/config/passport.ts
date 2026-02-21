@@ -63,14 +63,26 @@ if (googleOAuthEnabled) passport.use(
         const stateParam = (req.query.state as string) || '';
         const userType = stateParam.startsWith('vendor') ? 'vendor' : 'candidate';
 
+        // Generate URL-safe username slug (same logic as email/password registration)
+        const newId = crypto.randomUUID();
+        const cleanStr = (s?: string | null) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const first = cleanStr(profile.name?.givenName);
+        const last  = cleanStr(profile.name?.familyName);
+        const suffix = newId.replace(/-/g, '').slice(0, 6);
+        const username = first && last ? `${first}-${last}-${suffix}`
+                       : (first || last) ? `${first || last}-${suffix}`
+                       : `user-${suffix}`;
+
         const newUser = await prisma.user.create({
           data: {
+            id: newId,
             email,
             googleId: profile.id,
             // password is null — Google OAuth users have no password
             firstName: profile.name?.givenName || null,
             lastName: profile.name?.familyName || null,
             userType,
+            username,
             hasPurchasedVisibility: false,
             isActive: true,
             subscription: {
