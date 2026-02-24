@@ -1,4 +1,5 @@
 import express from "express";
+import compression from "compression";
 import cors from "cors";
 import helmet from "helmet";
 import passport from "passport";
@@ -11,6 +12,9 @@ import paymentsRoutes from "./routes/payments.routes";
 import { errorHandler, notFound } from "./middleware/error.middleware";
 
 const app = express();
+
+// Gzip compression — reduces API response size 60-80%
+app.use(compression());
 
 // Security headers
 app.use(helmet());

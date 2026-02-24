@@ -1,13 +1,9 @@
 import { PrismaClient } from '@prisma/client';
 
-const globalForPrisma = global as unknown as { prisma: PrismaClient };
+const isProd = process.env.NODE_ENV === 'production';
 
-export const prisma =
-  globalForPrisma.prisma ||
-  new PrismaClient({
-    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-  });
-
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma;
-}
+// In cluster mode each PM2 worker gets its own Prisma instance.
+// connection_limit is set per-worker via DATABASE_URL query params.
+export const prisma = new PrismaClient({
+  log: isProd ? ['error'] : ['query', 'error', 'warn'],
+});

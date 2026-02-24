@@ -77,6 +77,8 @@ function userResponse(
     username?: string | null;
     membershipConfig: string | null;
     hasPurchasedVisibility: boolean;
+    createdAt?: Date;
+    updatedAt?: Date;
   },
   plan: string,
 ) {
@@ -98,6 +100,8 @@ function userResponse(
     membership_config,
     has_purchased_visibility: user.hasPurchasedVisibility,
     plan,
+    created_at: user.createdAt?.toISOString() ?? null,
+    updated_at: user.updatedAt?.toISOString() ?? null,
   };
 }
 

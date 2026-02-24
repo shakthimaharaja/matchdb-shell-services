@@ -3,11 +3,11 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
-// SQLite does not support enums — using String fields instead.
+// String fields used for flexibility (no enum migration needed on switch from SQLite).
 // UserType: "candidate" | "vendor" | "admin"
 // Plan (vendor): "free" | "basic" | "pro" | "pro_plus"
 // SubStatus: "active" | "inactive" | "trialing" | "canceled" | "past_due"
