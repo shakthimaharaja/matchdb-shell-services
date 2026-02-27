@@ -25,7 +25,11 @@ Authentication, OAuth, Payments & Membership backend for the MatchDB staffing pl
 ```
 matchdb-shell-services/
 ├── prisma/
-│   └── schema.prisma          # User, Subscription, RefreshToken, CandidatePayment models
+│   ├── schema.prisma          # User, Subscription, RefreshToken, CandidatePayment models
+│   ├── seed.ts                # Prisma seed script (demo users)
+│   ├── set-provider.js        # Auto-switch provider between sqlite ↔ postgresql
+│   └── migrations/            # Prisma migration history
+├── Dockerfile                 # Production container image
 ├── src/
 │   ├── index.ts               # Entry point — starts Express server
 │   ├── app.ts                 # Express app (routes, middleware, Swagger)
