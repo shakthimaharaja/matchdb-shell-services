@@ -77,6 +77,8 @@ matchdb-shell-services/
 
 | Method | Path                               | Auth | Description                                       |
 | ------ | ---------------------------------- | ---- | ------------------------------------------------- |
+| GET    | `/api/payments/plans`              | No   | List subscription plans                           |
+| GET    | `/api/payments/subscription`       | Yes  | Get current user's subscription                   |
 | POST   | `/api/payments/checkout`           | Yes  | Create Stripe subscription checkout               |
 | POST   | `/api/payments/webhook`            | No   | Stripe webhook receiver                           |
 | POST   | `/api/payments/portal`             | Yes  | Create Stripe billing portal                      |
