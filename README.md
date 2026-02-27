@@ -226,16 +226,16 @@ All candidates have `hasPurchasedVisibility: true` for testing.
 
 ## Scripts
 
-| Script                    | Description                                                                |
-| ------------------------- | -------------------------------------------------------------------------- |
-| `npm run dev`             | Start with hot reload (tsx watch) — auto-sets Prisma to SQLite via `predev` |
+| Script                    | Description                                                                   |
+| ------------------------- | ----------------------------------------------------------------------------- |
+| `npm run dev`             | Start with hot reload (tsx watch) — auto-sets Prisma to SQLite via `predev`   |
 | `npm run build`           | Compile TypeScript to `dist/` — auto-sets Prisma to PostgreSQL via `prebuild` |
-| `npm start`               | Run compiled output                                                        |
-| `npm run prisma:generate` | Regenerate Prisma client                                                   |
-| `npm run prisma:migrate`  | Run database migrations                                                    |
-| `npm run prisma:deploy`   | Deploy migrations (production)                                             |
-| `npm run prisma:studio`   | Open Prisma Studio GUI                                                     |
-| `npm run prisma:seed`     | Seed database via Prisma                                                   |
+| `npm start`               | Run compiled output                                                           |
+| `npm run prisma:generate` | Regenerate Prisma client                                                      |
+| `npm run prisma:migrate`  | Run database migrations                                                       |
+| `npm run prisma:deploy`   | Deploy migrations (production)                                                |
+| `npm run prisma:studio`   | Open Prisma Studio GUI                                                        |
+| `npm run prisma:seed`     | Seed database via Prisma                                                      |
 
 > **Dual database provider:** A `prisma/set-provider.js` script automatically swaps the Prisma schema provider between `sqlite` (local dev via `predev`) and `postgresql` (production builds via `prebuild`). No manual switching is needed.
 
