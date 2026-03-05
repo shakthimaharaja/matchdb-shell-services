@@ -4,10 +4,8 @@
   "description": "MatchDB Auth & Payments backend - Node.js/Express/TypeScript",
   "main": "dist/index.js",
   "scripts": {
-    "predev": "node prisma/set-provider.js sqlite && npx prisma generate",
-    "dev": "tsx watch src/index.ts",
-    "prebuild": "node prisma/set-provider.js postgresql && npx prisma generate",
-    "build": "tsc",
+    "dev": "npx prisma generate && tsx watch src/index.ts",
+    "build": "npx prisma generate && tsc",
     "start": "node dist/index.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
@@ -16,7 +14,7 @@
     "prisma:seed": "prisma db seed"
   },
   "prisma": {
-    "seed": "tsx prisma/seed.ts"
+    "seed": "tsx src/scripts/seed.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.10.2",

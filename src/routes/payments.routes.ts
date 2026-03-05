@@ -6,6 +6,7 @@ import {
   getSubscription,
   createCheckout,
   createCandidateCheckout,
+  createMarketerCheckout,
   createPortal,
   stripeWebhook,
 } from "../controllers/payments.controller";
@@ -28,6 +29,7 @@ router.get("/candidate-packages", getCandidatePackages);
 router.get("/subscription", requireAuth, getSubscription);
 router.post("/checkout", requireAuth, createCheckout);               // Vendor recurring
 router.post("/candidate-checkout", requireAuth, createCandidateCheckout); // Candidate one-time
+router.post("/marketer-checkout", requireAuth, createMarketerCheckout);   // Marketer recurring
 router.post("/portal", requireAuth, createPortal);                   // Billing portal
 
 export default router;

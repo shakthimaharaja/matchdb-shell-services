@@ -38,6 +38,8 @@ export const env = {
   STRIPE_PRICE_VENDOR_BASIC: process.env.STRIPE_PRICE_VENDOR_BASIC || "",
   STRIPE_PRICE_VENDOR_PRO: process.env.STRIPE_PRICE_VENDOR_PRO || "",
   STRIPE_PRICE_VENDOR_PRO_PLUS: process.env.STRIPE_PRICE_VENDOR_PRO_PLUS || "",
+  // Marketer recurring subscription ($100/month)
+  STRIPE_MARKETER_PRICE_ID: process.env.STRIPE_MARKETER_PRICE_ID || "",
   // Candidate one-time visibility package price IDs
   STRIPE_PRICE_CANDIDATE_BASE: process.env.STRIPE_PRICE_CANDIDATE_BASE || "",
   STRIPE_PRICE_CANDIDATE_SUBDOMAIN_ADDON:

@@ -4,6 +4,7 @@ import { prisma } from "../config/prisma";
 import {
   stripe,
   VENDOR_PLAN_DEFINITIONS,
+  MARKETER_PLAN,
   CANDIDATE_PACKAGES,
   CandidatePackageId,
   createOrGetStripeCustomer,
@@ -15,7 +16,7 @@ import { sendSubscriptionActivatedEmail } from "../services/sendgrid.service";
 import { env } from "../config/env";
 
 // SQLite doesn't support Prisma enums — define locally
-type VendorPlan = "free" | "basic" | "pro" | "pro_plus";
+type VendorPlan = "free" | "basic" | "pro" | "pro_plus" | "marketer";
 type SubStatus = "active" | "inactive" | "trialing" | "canceled" | "past_due";
 
 // ─── Subdomain constants ──────────────────────────────────────────────────────
@@ -307,6 +308,65 @@ export async function createCandidateCheckout(
   }
 }
 
+// ─── Marketer Checkout (recurring subscription) ───────────────────────────────
+
+export async function createMarketerCheckout(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    if (!MARKETER_PLAN.stripePriceId) {
+      res.status(503).json({ error: "Marketer plan is not configured yet" });
+      return;
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      include: { subscription: true },
+    });
+    if (!user) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+    if (user.userType !== "marketer") {
+      res.status(403).json({ error: "Marketer account required" });
+      return;
+    }
+
+    let stripeCustomerId = user.subscription?.stripeCustomerId;
+    if (!stripeCustomerId) {
+      stripeCustomerId = await createOrGetStripeCustomer(
+        user.id,
+        user.email,
+        `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email,
+      );
+      await prisma.subscription.upsert({
+        where: { userId: user.id },
+        create: {
+          userId: user.id,
+          stripeCustomerId,
+          plan: "free",
+          status: "inactive",
+        },
+        update: { stripeCustomerId },
+      });
+    }
+
+    const url = await createCheckoutSession({
+      stripeCustomerId,
+      stripePriceId: MARKETER_PLAN.stripePriceId,
+      successUrl: `${env.CLIENT_URL}/?success=true`,
+      cancelUrl: `${env.CLIENT_URL}/?canceled=true`,
+      userId: user.id,
+    });
+
+    res.json({ url });
+  } catch (err) {
+    next(err);
+  }
+}
+
 // ─── Billing Portal ───────────────────────────────────────────────────────────
 
 export async function createPortal(
@@ -365,20 +425,25 @@ export async function stripeWebhook(
         const customerId = sub.customer as string;
 
         const priceId = sub.items.data[0]?.price.id || "";
-        const planDef = VENDOR_PLAN_DEFINITIONS.find(
-          (p) => p.stripePriceId === priceId,
-        );
 
-        // Map plan definition ID → plan string
-        const plan = (
-          planDef?.id === "pro_plus"
-            ? "pro_plus"
-            : planDef?.id === "pro"
-              ? "pro"
-              : planDef?.id === "basic"
-                ? "basic"
-                : "free"
-        ) as VendorPlan;
+        // Check marketer plan first
+        let plan: string;
+        if (priceId && priceId === MARKETER_PLAN.stripePriceId) {
+          plan = "marketer";
+        } else {
+          const planDef = VENDOR_PLAN_DEFINITIONS.find(
+            (p) => p.stripePriceId === priceId,
+          );
+          plan = (
+            planDef?.id === "pro_plus"
+              ? "pro_plus"
+              : planDef?.id === "pro"
+                ? "pro"
+                : planDef?.id === "basic"
+                  ? "basic"
+                  : "free"
+          ) as VendorPlan;
+        }
 
         const status = sub.status as SubStatus;
         const currentPeriodEnd = new Date(sub.current_period_end * 1000);

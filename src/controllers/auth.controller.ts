@@ -18,7 +18,7 @@ const registerSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
-  userType: z.enum(["candidate", "vendor"]),
+  userType: z.enum(["candidate", "vendor", "marketer"]),
 });
 
 const loginSchema = z.object({
@@ -157,7 +157,7 @@ export async function register(
     sendWelcomeEmail({
       to: user.email,
       firstName: user.firstName || "there",
-      userType: user.userType as "candidate" | "vendor",
+      userType: user.userType === "vendor" ? "vendor" : "candidate",
     }).catch(console.error);
 
     res.status(201).json({
@@ -249,7 +249,8 @@ export function googleAuth(
     res.status(501).json({ error: "Google OAuth is not configured on this server." });
     return;
   }
-  const userType = (req.query.userType as string) === "vendor" ? "vendor" : "candidate";
+  const qt = req.query.userType as string;
+  const userType = qt === "vendor" ? "vendor" : qt === "marketer" ? "marketer" : "candidate";
   // State encodes userType so the callback can read it; nonce prevents CSRF
   const state = `${userType}:${crypto.randomUUID()}`;
 

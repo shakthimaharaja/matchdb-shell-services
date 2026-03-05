@@ -84,6 +84,25 @@ export const VENDOR_PLAN_DEFINITIONS: PlanDefinition[] = [
   },
 ];
 
+// ─── Marketer Subscription Plan (recurring monthly) ─────────────────────────
+
+export const MARKETER_PLAN: PlanDefinition = {
+  id: 'marketer',
+  name: 'Marketer Membership',
+  price: 100,
+  interval: 'month',
+  features: [
+    'Live job openings feed (all vendors)',
+    'Live candidate profiles feed',
+    'Real-time new-entry notifications',
+    'Searchable & paginated tables',
+    'Monthly billing via Stripe · Cancel anytime',
+  ],
+  stripePriceId: env.STRIPE_MARKETER_PRICE_ID,
+  jobLimit: 0,
+  pokeLimit: 0,
+};
+
 // ─── Candidate One-Time Visibility Packages ───────────────────────────────────
 
 export type CandidatePackageId =
