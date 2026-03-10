@@ -1,13 +1,14 @@
 /**
  * seed.ts — Full MatchDB seed
- * Seeds: 3 users, 25 jobs, 25 candidate profiles, 25 rostered candidates, 25 forwarded openings
+ * Seeds: 4 users, 25 jobs, 25 candidate profiles, 25 rostered candidates, 25 forwarded openings
  *
  * Run: npx tsx src/scripts/seed.ts
  *
  * Credentials:
- *   candidate@test.com  / Test1234!     (hasPurchasedVisibility=true, plan=marketer)
- *   vendor@test.com     / Test1234!     (plan=pro)
- *   marketer@test.com   / Marketer123! (plan=marketer)
+ *   candidate@test.com      / Test1234!     (hasPurchasedVisibility=true, plan=marketer)
+ *   vendor@test.com         / Test1234!     (plan=pro)
+ *   marketer@test.com       / Test1234!     (plan=marketer)
+ *   maharajamahaa@gmail.com / Test1234!     (candidate)
  */
 
 import path from "path";
@@ -27,6 +28,7 @@ async function main() {
   console.log("🌱 Seeding MatchDB...");
 
   // ─── Clean existing data (order matters for FK constraints) ────────────────
+  await prisma.companyInvite.deleteMany();
   await prisma.forwardedOpening.deleteMany();
   await prisma.marketerCandidate.deleteMany();
   await prisma.company.deleteMany();
@@ -44,7 +46,6 @@ async function main() {
 
   // ─── Users ────────────────────────────────────────────────────────────────
   const password = await bcrypt.hash("Test1234!", 12);
-  const marketerPassword = await bcrypt.hash("Marketer123!", 12);
 
   const candidate = await prisma.user.create({
     data: {
@@ -90,11 +91,16 @@ async function main() {
   const marketer = await prisma.user.create({
     data: {
       email: "marketer@test.com",
-      password: marketerPassword,
+      password,
       username: "marketer-elite-c3d4e5",
       firstName: "Elite",
       lastName: "Staffing",
       userType: "marketer",
+      hasPurchasedVisibility: true,
+      membershipConfig: JSON.stringify({
+        contract: ["c2c", "w2", "c2h"],
+        full_time: ["w2", "direct_hire"],
+      }),
       subscription: {
         create: {
           plan: "marketer",
@@ -105,9 +111,30 @@ async function main() {
     },
   });
 
+  const maharaja = await prisma.user.create({
+    data: {
+      email: "maharajamahaa@gmail.com",
+      password,
+      username: "maharaja-maha-d4e5f6",
+      firstName: "Maharaja",
+      lastName: "Maha",
+      userType: "candidate",
+    },
+  });
+
   console.log(
-    `  ✓ Users: ${candidate.email}, ${vendor.email}, ${marketer.email}`,
+    `  ✓ Users: ${candidate.email}, ${vendor.email}, ${marketer.email}, ${maharaja.email}`,
   );
+
+  // ─── Marketer Company (created early so jobs can reference it) ────────────
+  const company = await prisma.company.create({
+    data: {
+      name: "Elite Staffing Solutions",
+      marketerId: marketer.id,
+      marketerEmail: marketer.email,
+    },
+  });
+  console.log(`  ✓ Company: ${company.name} (id=${company.id})`);
 
   // ─── Jobs (25) ────────────────────────────────────────────────────────────
   const jobData = [
@@ -648,6 +675,8 @@ async function main() {
             "salaryMin" in j && j.salaryMin != null ? j.salaryMin : undefined,
           salaryMax:
             "salaryMax" in j && j.salaryMax != null ? j.salaryMax : undefined,
+          sourceUserId: vendor.id,
+          sourceCompanyId: company.id,
         },
       }),
     ),
@@ -1420,16 +1449,7 @@ async function main() {
     `  ✓ Candidate profiles: 1 (logged-in) + ${profiles.length} (browsable) = ${1 + profiles.length} total`,
   );
 
-  // ─── Marketer Company + 25 Rostered Candidates ────────────────────────────
-  const company = await prisma.company.create({
-    data: {
-      name: "Elite Staffing Solutions",
-      marketerId: marketer.id,
-      marketerEmail: marketer.email,
-    },
-  });
-
-  // Roster all 24 browsable profiles + the logged-in candidate = 25
+  // ─── 25 Rostered Candidates ─────────────────────────────────────────────
   const rosterData = profileData.map((p, i) => ({
     companyId: company.id,
     marketerId: marketer.id,
@@ -1445,10 +1465,37 @@ async function main() {
     candidateEmail: candidate.email,
   });
 
-  await prisma.marketerCandidate.createMany({ data: rosterData });
+  // Add inviteStatus variety to roster entries for realistic mock data
+  const getInviteStatus = (i: number): string => {
+    if (i < 5) return "accepted";
+    if (i < 10) return "invited";
+    return "none";
+  };
+  await prisma.marketerCandidate.createMany({
+    data: rosterData.map((r, i) => ({
+      ...r,
+      inviteStatus: getInviteStatus(i),
+    })),
+  });
   console.log(
     `  ✓ Company: ${company.name}, ${rosterData.length} candidates rostered`,
   );
+
+  // Link the logged-in candidate's profile to the company
+  await prisma.candidateProfile.update({
+    where: { candidateId: candidate.id },
+    data: { companyId: company.id, companyName: company.name },
+  });
+
+  // Link accepted-invite candidates' profiles to the company
+  for (let i = 0; i < 5; i++) {
+    const seedCandidateId = `seed-candidate-${String(i + 1).padStart(3, "0")}`;
+    await prisma.candidateProfile.updateMany({
+      where: { candidateId: seedCandidateId },
+      data: { companyId: company.id, companyName: company.name },
+    });
+  }
+  console.log(`  ✓ Linked 5 accepted candidates + logged-in user to company`);
 
   // ─── Forwarded Openings (25 — one per job) ────────────────────────────────
   const allEmails = [...profileData.map((p) => p.email), candidate.email];
@@ -1478,12 +1525,453 @@ async function main() {
   await prisma.forwardedOpening.createMany({ data: forwardedData });
   console.log(`  ✓ Forwarded openings: ${forwardedData.length} created`);
 
+  // ─── Company Invites (mock: 5 accepted, 5 invited/pending) ────────────────
+  const inviteEmails = profileData.slice(0, 10).map((p) => p.email);
+  const inviteNames = profileData.slice(0, 10).map((p) => p.name);
+  const now = new Date();
+  const in14Days = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+
+  await prisma.companyInvite.createMany({
+    data: inviteEmails.map((email, i) => ({
+      companyId: company.id,
+      companyName: company.name,
+      marketerId: marketer.id,
+      marketerEmail: marketer.email,
+      candidateEmail: email,
+      candidateName: inviteNames[i],
+      offerNote: `We'd love to have you on the ${company.name} team! Great opportunity for ${profileData[i].skills.slice(0, 2).join(" & ")} professionals.`,
+      status: i < 5 ? "accepted" : "pending",
+      expiresAt: in14Days,
+    })),
+  });
+  console.log(`  ✓ Company invites: 5 accepted + 5 pending`);
+
+  // ─── Additional Vendor Users (for poke variety) ───────────────────────────
+  const vendorNames = [
+    { first: "Apex", last: "Recruiters", email: "apex.recruit@example.com" },
+    { first: "Global", last: "Talent", email: "global.talent@example.com" },
+    { first: "PrimeHire", last: "Inc", email: "primehire@example.com" },
+    { first: "Nova", last: "Search", email: "nova.search@example.com" },
+  ];
+  const extraVendors = await Promise.all(
+    vendorNames.map((v) =>
+      prisma.user.create({
+        data: {
+          email: v.email,
+          password,
+          username: v.email.split("@")[0].replace(/\./g, "-"),
+          firstName: v.first,
+          lastName: v.last,
+          userType: "vendor",
+          subscription: {
+            create: {
+              plan: "pro",
+              status: "active",
+              stripeSubId: `sub_seed_${v.email.split("@")[0]}`,
+            },
+          },
+        },
+      }),
+    ),
+  );
+  const allVendors = [vendor, ...extraVendors];
+  console.log(`  ✓ Extra vendors: ${extraVendors.length} created`);
+
+  // ─── Applications (seed projects for candidates) ──────────────────────────
+  // Give the first 10 candidates 2–4 applications each, mix of active/inactive
+  const applicationData: {
+    jobId: string;
+    jobTitle: string;
+    candidateId: string;
+    candidateEmail: string;
+    status: string;
+  }[] = [];
+
+  const appStatuses = [
+    "hired",
+    "shortlisted",
+    "pending",
+    "rejected",
+    "interviewing",
+  ];
+  const allCandidates = profileData.map((p, i) => ({
+    id: `seed-candidate-${String(i + 1).padStart(3, "0")}`,
+    email: p.email,
+  }));
+  // Also include the logged-in candidate
+  allCandidates.push({ id: candidate.id, email: candidate.email });
+
+  for (let ci = 0; ci < Math.min(12, allCandidates.length); ci++) {
+    const c = allCandidates[ci];
+    // Each candidate applies to 2–4 different jobs
+    const numApps = 2 + (ci % 3); // 2, 3, or 4
+    for (let ai = 0; ai < numApps; ai++) {
+      const jobIdx = (ci * 2 + ai) % jobs.length;
+      applicationData.push({
+        jobId: jobs[jobIdx].id,
+        jobTitle: jobs[jobIdx].title,
+        candidateId: c.id,
+        candidateEmail: c.email,
+        status: appStatuses[(ci + ai) % appStatuses.length],
+      });
+    }
+  }
+
+  await prisma.application.createMany({
+    data: applicationData,
+    skipDuplicates: true,
+  });
+  // Mark half of the associated jobs as inactive (previous projects)
+  const inactiveJobIds = [
+    ...new Set(applicationData.map((a) => a.jobId)),
+  ].filter((_, i) => i % 3 === 2);
+  if (inactiveJobIds.length > 0) {
+    await prisma.job.updateMany({
+      where: { id: { in: inactiveJobIds } },
+      data: { isActive: false },
+    });
+  }
+  console.log(
+    `  ✓ Applications: ${applicationData.length} created (${inactiveJobIds.length} jobs marked inactive)`,
+  );
+
+  // ─── Project Financials (realistic payroll data for visualization) ─────────
+  // Fetch created applications for the first 4 candidates to attach financials
+  const appsForFinancials = await prisma.application.findMany({
+    where: {
+      candidateEmail: {
+        in: [
+          profileData[0].email, // Priya Sharma
+          profileData[1].email, // Carlos Rivera
+          profileData[2].email, // Sarah Chen
+          profileData[3].email, // Marcus Johnson
+        ],
+      },
+    },
+    include: {
+      job: { select: { isActive: true, jobState: true, title: true } },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  // Helper: compute derived financial fields
+  const US_STATE_TAX_SEED: Record<string, number> = {
+    CA: 13.3,
+    NY: 10.9,
+    TX: 0,
+    WA: 0,
+    IL: 4.95,
+    FL: 0,
+    CO: 4.4,
+    GA: 5.49,
+    NC: 4.5,
+    MA: 5.0,
+    NJ: 10.75,
+    DC: 10.75,
+  };
+  function computeFinSeed(
+    billRate: number,
+    payRate: number,
+    hours: number,
+    stateCode: string,
+    cashPct: number,
+    amountPaid: number,
+  ) {
+    const stateTaxPct = US_STATE_TAX_SEED[stateCode] ?? 0;
+    const totalBilled = billRate * hours;
+    const totalPay = payRate * hours;
+    const taxAmount = (totalPay * stateTaxPct) / 100;
+    const cashAmount = (totalPay * cashPct) / 100;
+    const netPayable = totalPay - taxAmount - cashAmount;
+    const amountPending = netPayable - amountPaid;
+    return {
+      stateTaxPct,
+      totalBilled,
+      totalPay,
+      taxAmount,
+      cashAmount,
+      netPayable,
+      amountPending,
+    };
+  }
+
+  // Seed configs: (candidateEmail, jobTitle-substring, billRate, payRate, hours, state, cashPct, amountPaid, projStart, projEnd)
+  type FinSeedRow = {
+    candidateEmail: string;
+    jobTitleMatch: string;
+    billRate: number;
+    payRate: number;
+    hours: number;
+    state: string;
+    cashPct: number;
+    amountPaid: number;
+    projStart: string;
+    projEnd: string | null;
+    notes: string;
+  };
+
+  const finSeeds: FinSeedRow[] = [
+    // ── Priya Sharma – 2 projects ─────────────────────────────────────────
+    {
+      candidateEmail: profileData[0].email,
+      jobTitleMatch: "Senior React",
+      billRate: 95,
+      payRate: 74,
+      hours: 320,
+      state: "CA",
+      cashPct: 5,
+      amountPaid: 17800,
+      projStart: "2025-10-01",
+      projEnd: null,
+      notes: "Active engagement — invoiced bi-weekly.",
+    },
+    {
+      candidateEmail: profileData[0].email,
+      jobTitleMatch: "Full Stack",
+      billRate: 100,
+      payRate: 78,
+      hours: 480,
+      state: "NY",
+      cashPct: 4,
+      amountPaid: 26240,
+      projStart: "2025-04-15",
+      projEnd: "2025-09-30",
+      notes: "Completed 6-month engagement. All invoices settled.",
+    },
+    // ── Carlos Rivera – 2 projects ────────────────────────────────────────
+    {
+      candidateEmail: profileData[1].email,
+      jobTitleMatch: "Java",
+      billRate: 90,
+      payRate: 68,
+      hours: 280,
+      state: "TX",
+      cashPct: 4,
+      amountPaid: 14200,
+      projStart: "2025-11-01",
+      projEnd: null,
+      notes: "C2H engagement — conversion clause at month 6.",
+    },
+    {
+      candidateEmail: profileData[1].email,
+      jobTitleMatch: "DevOps",
+      billRate: 85,
+      payRate: 65,
+      hours: 400,
+      state: "TX",
+      cashPct: 3,
+      amountPaid: 26000,
+      projStart: "2025-05-01",
+      projEnd: "2025-10-31",
+      notes: "Fully paid. Strong performance — referral bonus issued.",
+    },
+    // ── Sarah Chen – 2 projects ───────────────────────────────────────────
+    {
+      candidateEmail: profileData[2].email,
+      jobTitleMatch: "Data Engineer",
+      billRate: 130,
+      payRate: 100,
+      hours: 240,
+      state: "WA",
+      cashPct: 5,
+      amountPaid: 14400,
+      projStart: "2025-12-01",
+      projEnd: null,
+      notes: "High-value placement — WA has no state income tax.",
+    },
+    {
+      candidateEmail: profileData[2].email,
+      jobTitleMatch: "Machine Learning",
+      billRate: 145,
+      payRate: 110,
+      hours: 360,
+      state: "CA",
+      cashPct: 5,
+      amountPaid: 28380,
+      projStart: "2025-06-01",
+      projEnd: "2025-11-30",
+      notes: "ML placement at Series B startup. Fully paid.",
+    },
+    // ── Marcus Johnson – 2 projects ───────────────────────────────────────
+    {
+      candidateEmail: profileData[3].email,
+      jobTitleMatch: "Salesforce",
+      billRate: 80,
+      payRate: 62,
+      hours: 200,
+      state: "GA",
+      cashPct: 4,
+      amountPaid: 7200,
+      projStart: "2026-01-06",
+      projEnd: null,
+      notes: "New engagement started Jan 2026.",
+    },
+    {
+      candidateEmail: profileData[3].email,
+      jobTitleMatch: "Cybersecurity",
+      billRate: 95,
+      payRate: 72,
+      hours: 320,
+      state: "DC",
+      cashPct: 5,
+      amountPaid: 14350,
+      projStart: "2025-07-01",
+      projEnd: "2025-12-31",
+      notes: "Federal contractor — DC tax applied. Closed at year-end.",
+    },
+  ];
+
+  let finCreated = 0;
+  for (const seed of finSeeds) {
+    // Find the matching application
+    const app = appsForFinancials.find(
+      (a) =>
+        a.candidateEmail === seed.candidateEmail &&
+        a.job?.title?.toLowerCase().includes(seed.jobTitleMatch.toLowerCase()),
+    );
+    if (!app) continue;
+
+    const c = computeFinSeed(
+      seed.billRate,
+      seed.payRate,
+      seed.hours,
+      seed.state,
+      seed.cashPct,
+      seed.amountPaid,
+    );
+
+    await prisma.projectFinancial.upsert({
+      where: {
+        applicationId_marketerId: {
+          applicationId: app.id,
+          marketerId: marketer.id,
+        },
+      },
+      create: {
+        applicationId: app.id,
+        marketerId: marketer.id,
+        candidateId: app.candidateId,
+        candidateEmail: seed.candidateEmail,
+        billRate: seed.billRate,
+        payRate: seed.payRate,
+        hoursWorked: seed.hours,
+        projectStart: new Date(seed.projStart),
+        projectEnd: seed.projEnd ? new Date(seed.projEnd) : null,
+        stateCode: seed.state,
+        stateTaxPct: c.stateTaxPct,
+        cashPct: seed.cashPct,
+        totalBilled: c.totalBilled,
+        totalPay: c.totalPay,
+        taxAmount: c.taxAmount,
+        cashAmount: c.cashAmount,
+        netPayable: c.netPayable,
+        amountPaid: seed.amountPaid,
+        amountPending: c.amountPending,
+        notes: seed.notes,
+      },
+      update: {},
+    });
+    finCreated++;
+  }
+  console.log(`  ✓ Project financials: ${finCreated} records seeded`);
+
+  // ─── Poke Records (vendor interactions with candidates) ───────────────────
+  const pokeSubjects = [
+    "Great fit for our React role",
+    "Interested in Java position?",
+    "Cloud engineer opportunity",
+    "Your profile caught our eye",
+    "Let's discuss a new opening",
+    "Senior role just opened up",
+    "Remote opportunity matching your skills",
+    "Quick intro from our team",
+  ];
+
+  const pokeData: {
+    senderId: string;
+    senderName: string;
+    senderEmail: string;
+    senderType: string;
+    targetId: string;
+    targetEmail: string;
+    targetName: string;
+    subject: string;
+    isEmail: boolean;
+    jobId?: string;
+    jobTitle?: string;
+  }[] = [];
+
+  // For each of the first 12 candidates, create pokes/emails from 2–3 different vendors
+  for (let ci = 0; ci < Math.min(12, allCandidates.length); ci++) {
+    const c = allCandidates[ci];
+    const cName =
+      ci < profileData.length ? profileData[ci].name : "Alex Morgan";
+    const numVendors = 2 + (ci % 2); // 2 or 3 vendors per candidate
+
+    for (let vi = 0; vi < numVendors; vi++) {
+      const v = allVendors[vi % allVendors.length];
+      const vName =
+        vi === 0
+          ? "TechCorp HR"
+          : vendorNames[(vi - 1) % vendorNames.length].first +
+            " " +
+            vendorNames[(vi - 1) % vendorNames.length].last;
+      const jobIdx = (ci * 2 + vi) % jobs.length;
+
+      // Poke (isEmail=false)
+      pokeData.push({
+        senderId: v.id,
+        senderName: vName,
+        senderEmail: v.email,
+        senderType: "vendor",
+        targetId: c.id,
+        targetEmail: c.email,
+        targetName: cName,
+        subject: pokeSubjects[(ci + vi) % pokeSubjects.length],
+        isEmail: false,
+        jobId: jobs[jobIdx].id,
+        jobTitle: jobs[jobIdx].title,
+      });
+
+      // Email (isEmail=true)
+      pokeData.push({
+        senderId: v.id,
+        senderName: vName,
+        senderEmail: v.email,
+        senderType: "vendor",
+        targetId: c.id,
+        targetEmail: c.email,
+        targetName: cName,
+        subject: pokeSubjects[(ci + vi + 1) % pokeSubjects.length],
+        isEmail: true,
+        jobId: jobs[(jobIdx + 1) % jobs.length].id,
+        jobTitle: jobs[(jobIdx + 1) % jobs.length].title,
+      });
+    }
+  }
+
+  // deduplicate by unique key [senderId, targetId, isEmail]
+  const seen = new Set<string>();
+  const uniquePokes = pokeData.filter((p) => {
+    const key = `${p.senderId}|${p.targetId}|${p.isEmail}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  await prisma.pokeRecord.createMany({ data: uniquePokes });
+  console.log(
+    `  ✓ Poke records: ${uniquePokes.length} created (pokes + emails)`,
+  );
+
   // ─── Summary ──────────────────────────────────────────────────────────────
   console.log("\n✅ Seed complete!");
   console.log(`   Jobs: ${jobs.length}`);
   console.log(`   Candidate profiles: ${1 + profiles.length}`);
   console.log(`   Rostered candidates: ${rosterData.length}`);
   console.log(`   Forwarded openings: ${forwardedData.length}`);
+  console.log(`   Applications: ${applicationData.length}`);
+  console.log(`   Poke records: ${uniquePokes.length}`);
   console.log("\nTest credentials:");
   console.log(
     "  candidate@test.com  / Test1234!     (userType: candidate, hasPurchasedVisibility: true)",
@@ -1492,7 +1980,7 @@ async function main() {
     "  vendor@test.com     / Test1234!     (userType: vendor, plan: pro)",
   );
   console.log(
-    "  marketer@test.com   / Marketer123!  (userType: marketer, plan: marketer)",
+    "  marketer@test.com   / Test1234!     (userType: marketer, plan: marketer)",
   );
 }
 

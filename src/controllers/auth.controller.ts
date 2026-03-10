@@ -19,6 +19,7 @@ const registerSchema = z.object({
   firstName: z.string().optional(),
   lastName: z.string().optional(),
   userType: z.enum(["candidate", "vendor", "marketer"]),
+  companyName: z.string().optional(),
 });
 
 const loginSchema = z.object({
@@ -148,6 +149,20 @@ export async function register(
     }) as { id: string; email: string; firstName: string | null; lastName: string | null;
              userType: string; username: string | null; membershipConfig: string | null;
              hasPurchasedVisibility: boolean; subscription: { plan: string } | null };
+
+    // Auto-create a Company record for marketer users
+    if (body.userType === "marketer") {
+      const companyName =
+        body.companyName ||
+        `${body.firstName || ""} ${body.lastName || ""}'s Company`.trim();
+      await prisma.company.create({
+        data: {
+          name: companyName,
+          marketerId: user.id,
+          marketerEmail: user.email,
+        },
+      });
+    }
 
     const plan = user.subscription?.plan || "free";
     const { access, refresh } = makeTokens(user, plan);
