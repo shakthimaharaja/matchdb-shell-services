@@ -11,7 +11,7 @@
  *   maharajamahaa@gmail.com / Test1234!     (candidate)
  */
 
-import path from "path";
+import path from "node:path";
 import dotenv from "dotenv";
 
 dotenv.config({
@@ -23,6 +23,29 @@ import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
+
+function buildApplicationData(
+  allCandidates: { id: string; email: string }[],
+  jobs: { id: string; title: string }[],
+  appStatuses: string[],
+) {
+  const data: { jobId: string; jobTitle: string; candidateId: string; candidateEmail: string; status: string }[] = [];
+  for (let ci = 0; ci < Math.min(12, allCandidates.length); ci++) {
+    const c = allCandidates[ci];
+    const numApps = 2 + (ci % 3);
+    for (let ai = 0; ai < numApps; ai++) {
+      const jobIdx = (ci * 2 + ai) % jobs.length;
+      data.push({
+        jobId: jobs[jobIdx].id,
+        jobTitle: jobs[jobIdx].title,
+        candidateId: c.id,
+        candidateEmail: c.email,
+        status: appStatuses[(ci + ai) % appStatuses.length],
+      });
+    }
+  }
+  return data;
+}
 
 async function main() {
   console.log("🌱 Seeding MatchDB...");
@@ -1400,7 +1423,7 @@ async function main() {
   ];
 
   // ── Profile for the logged-in candidate user (candidate@test.com) ──────
-  const candidateProfile = await prisma.candidateProfile.create({
+  await prisma.candidateProfile.create({
     data: {
       candidateId: candidate.id,
       username: "alex-morgan-a1b2c3",
@@ -1436,10 +1459,9 @@ async function main() {
         data: {
           ...p,
           candidateId: `seed-candidate-${String(i + 1).padStart(3, "0")}`,
-          username: p.email.split("@")[0].replace(/\./g, "-"),
+          username: p.email.split("@")[0].replaceAll(".", "-"),
           visibilityConfig: p.visibilityConfig as any,
-          expectedHourlyRate:
-            p.expectedHourlyRate != null ? p.expectedHourlyRate : undefined,
+          expectedHourlyRate: p.expectedHourlyRate ?? undefined,
         },
       }),
     ),
@@ -1559,7 +1581,7 @@ async function main() {
         data: {
           email: v.email,
           password,
-          username: v.email.split("@")[0].replace(/\./g, "-"),
+          username: v.email.split("@")[0].replaceAll(".", "-"),
           firstName: v.first,
           lastName: v.last,
           userType: "vendor",
@@ -1579,14 +1601,6 @@ async function main() {
 
   // ─── Applications (seed projects for candidates) ──────────────────────────
   // Give the first 10 candidates 2–4 applications each, mix of active/inactive
-  const applicationData: {
-    jobId: string;
-    jobTitle: string;
-    candidateId: string;
-    candidateEmail: string;
-    status: string;
-  }[] = [];
-
   const appStatuses = [
     "hired",
     "shortlisted",
@@ -1601,21 +1615,7 @@ async function main() {
   // Also include the logged-in candidate
   allCandidates.push({ id: candidate.id, email: candidate.email });
 
-  for (let ci = 0; ci < Math.min(12, allCandidates.length); ci++) {
-    const c = allCandidates[ci];
-    // Each candidate applies to 2–4 different jobs
-    const numApps = 2 + (ci % 3); // 2, 3, or 4
-    for (let ai = 0; ai < numApps; ai++) {
-      const jobIdx = (ci * 2 + ai) % jobs.length;
-      applicationData.push({
-        jobId: jobs[jobIdx].id,
-        jobTitle: jobs[jobIdx].title,
-        candidateId: c.id,
-        candidateEmail: c.email,
-        status: appStatuses[(ci + ai) % appStatuses.length],
-      });
-    }
-  }
+  const applicationData = buildApplicationData(allCandidates, jobs, appStatuses);
 
   await prisma.application.createMany({
     data: applicationData,
@@ -1665,7 +1665,7 @@ async function main() {
     CO: 4.4,
     GA: 5.49,
     NC: 4.5,
-    MA: 5.0,
+    MA: 5,
     NJ: 10.75,
     DC: 10.75,
   };
@@ -1918,35 +1918,35 @@ async function main() {
             vendorNames[(vi - 1) % vendorNames.length].last;
       const jobIdx = (ci * 2 + vi) % jobs.length;
 
-      // Poke (isEmail=false)
-      pokeData.push({
-        senderId: v.id,
-        senderName: vName,
-        senderEmail: v.email,
-        senderType: "vendor",
-        targetId: c.id,
-        targetEmail: c.email,
-        targetName: cName,
-        subject: pokeSubjects[(ci + vi) % pokeSubjects.length],
-        isEmail: false,
-        jobId: jobs[jobIdx].id,
-        jobTitle: jobs[jobIdx].title,
-      });
-
-      // Email (isEmail=true)
-      pokeData.push({
-        senderId: v.id,
-        senderName: vName,
-        senderEmail: v.email,
-        senderType: "vendor",
-        targetId: c.id,
-        targetEmail: c.email,
-        targetName: cName,
-        subject: pokeSubjects[(ci + vi + 1) % pokeSubjects.length],
-        isEmail: true,
-        jobId: jobs[(jobIdx + 1) % jobs.length].id,
-        jobTitle: jobs[(jobIdx + 1) % jobs.length].title,
-      });
+      // Poke (isEmail=false) + Email (isEmail=true)
+      pokeData.push(
+        {
+          senderId: v.id,
+          senderName: vName,
+          senderEmail: v.email,
+          senderType: "vendor",
+          targetId: c.id,
+          targetEmail: c.email,
+          targetName: cName,
+          subject: pokeSubjects[(ci + vi) % pokeSubjects.length],
+          isEmail: false,
+          jobId: jobs[jobIdx].id,
+          jobTitle: jobs[jobIdx].title,
+        },
+        {
+          senderId: v.id,
+          senderName: vName,
+          senderEmail: v.email,
+          senderType: "vendor",
+          targetId: c.id,
+          targetEmail: c.email,
+          targetName: cName,
+          subject: pokeSubjects[(ci + vi + 1) % pokeSubjects.length],
+          isEmail: true,
+          jobId: jobs[(jobIdx + 1) % jobs.length].id,
+          jobTitle: jobs[(jobIdx + 1) % jobs.length].title,
+        },
+      );
     }
   }
 
@@ -1984,11 +1984,11 @@ async function main() {
   );
 }
 
-main()
-  .catch((err) => {
-    console.error("❌ Seed failed:", err);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+try {
+  await main();
+} catch (err) {
+  console.error("❌ Seed failed:", err);
+  process.exit(1);
+} finally {
+  await prisma.$disconnect();
+}

@@ -114,6 +114,8 @@ This service **owns the schema** for the entire MatchDB platform. Both `matchdb-
 - **Company** — `name`, `marketerId`, `marketerEmail`
 - **MarketerCandidate** — `companyId`, `marketerId`, `candidateId`
 - **ForwardedOpening** — `marketerId`, `candidateId`, `jobId`
+- **CompanyInvite** — `companyId`, `marketerId`, `candidateEmail`, `token`, `status`, `expiresAt`
+- **ProjectFinancial** — `applicationId`, `companyId`, `candidateId`, `billRate`, `payRate`, `hoursPerWeek`, `margin`
 
 ---
 

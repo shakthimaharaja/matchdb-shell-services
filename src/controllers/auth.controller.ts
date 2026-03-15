@@ -36,17 +36,22 @@ function generateUsername(
   id: string,
 ): string {
   const clean = (s?: string | null) =>
-    (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    (s || "").toLowerCase().replaceAll(/[^a-z0-9]/g, "");
   const first = clean(firstName);
-  const last  = clean(lastName);
-  const suffix = id.replace(/-/g, "").slice(0, 6);
+  const last = clean(lastName);
+  const suffix = id.replaceAll("-", "").slice(0, 6);
   if (first && last) return `${first}-${last}-${suffix}`;
-  if (first || last)  return `${first || last}-${suffix}`;
+  if (first || last) return `${first || last}-${suffix}`;
   return `user-${suffix}`;
 }
 
 function makeTokens(
-  user: { id: string; email: string; userType: string; username?: string | null },
+  user: {
+    id: string;
+    email: string;
+    userType: string;
+    username?: string | null;
+  },
   plan: string,
 ) {
   const access = signAccessToken({
@@ -131,7 +136,7 @@ export async function register(
 
     // Cast to any so TypeScript accepts `username` before `prisma generate` is re-run
     // after the schema migration. The column exists at runtime via `prisma db push`.
-    const user = await (prisma.user as any).create({
+    const user = (await (prisma.user as any).create({
       data: {
         id: newId,
         email: body.email,
@@ -146,9 +151,17 @@ export async function register(
         },
       },
       include: { subscription: true },
-    }) as { id: string; email: string; firstName: string | null; lastName: string | null;
-             userType: string; username: string | null; membershipConfig: string | null;
-             hasPurchasedVisibility: boolean; subscription: { plan: string } | null };
+    })) as {
+      id: string;
+      email: string;
+      firstName: string | null;
+      lastName: string | null;
+      userType: string;
+      username: string | null;
+      membershipConfig: string | null;
+      hasPurchasedVisibility: boolean;
+      subscription: { plan: string } | null;
+    };
 
     // Auto-create a Company record for marketer users
     if (body.userType === "marketer") {
@@ -207,7 +220,7 @@ export async function login(
       include: { subscription: true },
     });
 
-    if (!user || !user.isActive) {
+    if (!user?.isActive) {
       const err: AppError = new Error("Invalid email or password");
       err.statusCode = 401;
       return next(err);
@@ -261,11 +274,17 @@ export function googleAuth(
   next: NextFunction,
 ): void {
   if (!googleOAuthEnabled) {
-    res.status(501).json({ error: "Google OAuth is not configured on this server." });
+    res
+      .status(501)
+      .json({ error: "Google OAuth is not configured on this server." });
     return;
   }
   const qt = req.query.userType as string;
-  const userType = qt === "vendor" ? "vendor" : qt === "marketer" ? "marketer" : "candidate";
+  const USER_TYPE_MAP: Record<string, string> = {
+    vendor: "vendor",
+    marketer: "marketer",
+  };
+  const userType = USER_TYPE_MAP[qt] || "candidate";
   // State encodes userType so the callback can read it; nonce prevents CSRF
   const state = `${userType}:${crypto.randomUUID()}`;
 
@@ -286,7 +305,9 @@ export function googleCallback(
   next: NextFunction,
 ): void {
   if (!googleOAuthEnabled) {
-    return res.redirect(`${env.CLIENT_URL}/login?oauth_error=not_configured`) as any;
+    return res.redirect(
+      `${env.CLIENT_URL}/login?oauth_error=not_configured`,
+    ) as any;
   }
   passport.authenticate(
     "google",
@@ -359,7 +380,7 @@ export async function refreshToken(
       include: { subscription: true },
     });
 
-    if (!user || !user.isActive) {
+    if (!user?.isActive) {
       res.status(401).json({ error: "User not found or inactive" });
       return;
     }
@@ -397,7 +418,7 @@ export async function verify(
       include: { subscription: true },
     });
 
-    if (!user || !user.isActive) {
+    if (!user?.isActive) {
       res.status(401).json({ error: "User not found" });
       return;
     }

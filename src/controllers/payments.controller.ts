@@ -19,6 +19,17 @@ import { env } from "../config/env";
 type VendorPlan = "free" | "basic" | "pro" | "pro_plus" | "marketer";
 type SubStatus = "active" | "inactive" | "trialing" | "canceled" | "past_due";
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const VALID_VENDOR_PLANS = new Set<string>(["pro_plus", "pro", "basic"]);
+
+function resolvePlanFromDef(planDef: { id: string } | undefined): VendorPlan {
+  if (planDef && VALID_VENDOR_PLANS.has(planDef.id)) {
+    return planDef.id as VendorPlan;
+  }
+  return "free";
+}
+
 // ─── Subdomain constants ──────────────────────────────────────────────────────
 
 const CONTRACT_SUBDOMAINS = ["c2c", "c2h", "w2", "1099"];
@@ -38,48 +49,56 @@ function computeMembershipConfig(
   const config: Record<string, string[]> = {};
 
   for (const payment of payments) {
-    let subs: string[] = [];
-    try {
-      subs = JSON.parse(payment.subdomains) as string[];
-    } catch {
-      subs = [];
-    }
-
-    if (payment.packageType === "full_bundle") {
-      // Full bundle: all subdomains across both domains
-      config["contract"] = [...CONTRACT_SUBDOMAINS];
-      config["full_time"] = [...FULLTIME_SUBDOMAINS];
-    } else if (
-      payment.packageType === "single_domain_bundle" &&
-      payment.domain
-    ) {
-      const allSubs =
-        payment.domain === "contract"
-          ? CONTRACT_SUBDOMAINS
-          : FULLTIME_SUBDOMAINS;
-      if (!config[payment.domain]) {
-        config[payment.domain] = [];
-      }
-      // Union merge
-      for (const s of allSubs) {
-        if (!config[payment.domain].includes(s)) {
-          config[payment.domain].push(s);
-        }
-      }
-    } else if (payment.domain && subs.length > 0) {
-      // base or subdomain_addon: union the specific subdomains into the domain key
-      if (!config[payment.domain]) {
-        config[payment.domain] = [];
-      }
-      for (const s of subs) {
-        if (!config[payment.domain].includes(s)) {
-          config[payment.domain].push(s);
-        }
-      }
-    }
+    processPayment(config, payment);
   }
 
   return config;
+}
+
+function unionMerge(
+  config: Record<string, string[]>,
+  domain: string,
+  subs: string[],
+): void {
+  if (!config[domain]) {
+    config[domain] = [];
+  }
+  for (const s of subs) {
+    if (!config[domain].includes(s)) {
+      config[domain].push(s);
+    }
+  }
+}
+
+function processPayment(
+  config: Record<string, string[]>,
+  payment: { packageType: string; domain: string | null; subdomains: string },
+): void {
+  if (payment.packageType === "full_bundle") {
+    config["contract"] = [...CONTRACT_SUBDOMAINS];
+    config["full_time"] = [...FULLTIME_SUBDOMAINS];
+    return;
+  }
+
+  if (!payment.domain) return;
+
+  if (payment.packageType === "single_domain_bundle") {
+    const allSubs =
+      payment.domain === "contract" ? CONTRACT_SUBDOMAINS : FULLTIME_SUBDOMAINS;
+    unionMerge(config, payment.domain, allSubs);
+    return;
+  }
+
+  let subs: string[] = [];
+  try {
+    subs = JSON.parse(payment.subdomains) as string[];
+  } catch {
+    subs = [];
+  }
+
+  if (subs.length > 0) {
+    unionMerge(config, payment.domain, subs);
+  }
 }
 
 // ─── Plans / Packages ─────────────────────────────────────────────────────────
@@ -120,7 +139,7 @@ export async function createCheckout(
     const { planId } = req.body as { planId?: string };
     const plan = VENDOR_PLAN_DEFINITIONS.find((p) => p.id === planId);
 
-    if (!plan || !plan.stripePriceId) {
+    if (!plan?.stripePriceId) {
       res.status(400).json({ error: "Invalid plan or free plan selected" });
       return;
     }
@@ -176,6 +195,28 @@ export async function createCheckout(
 
 // ─── Candidate Checkout (one-time payment) ────────────────────────────────────
 
+function validateCandidatePackageInput(
+  packageId: CandidatePackageId,
+  domain: string | undefined,
+  subdomains: string[] | undefined,
+): string | null {
+  if (packageId === "base") {
+    if (!domain)
+      return "Domain (contract or full_time) is required for the base package";
+    if (!subdomains?.length || subdomains.length !== 1)
+      return "Exactly one subdomain must be selected for the base package";
+  }
+  if (packageId === "subdomain_addon") {
+    if (!domain) return "Domain is required for subdomain add-ons";
+    if (!subdomains || subdomains.length === 0)
+      return "At least one subdomain must be selected";
+  }
+  if (packageId === "single_domain_bundle" && !domain) {
+    return "Domain (contract or full_time) is required for single domain bundle";
+  }
+  return null;
+}
+
 export async function createCandidateCheckout(
   req: Request,
   res: Response,
@@ -194,55 +235,20 @@ export async function createCandidateCheckout(
     }
 
     const pkg = CANDIDATE_PACKAGES.find((p) => p.id === packageId);
-    if (!pkg || !pkg.stripePriceId) {
+    if (!pkg?.stripePriceId) {
       res
         .status(400)
         .json({ error: "Invalid package ID or package not configured" });
       return;
     }
 
-    // Validate required fields per package type
-    if (packageId === "base") {
-      if (!domain) {
-        res
-          .status(400)
-          .json({
-            error:
-              "Domain (contract or full_time) is required for the base package",
-          });
-        return;
-      }
-      if (!subdomains || subdomains.length !== 1) {
-        res
-          .status(400)
-          .json({
-            error:
-              "Exactly one subdomain must be selected for the base package",
-          });
-        return;
-      }
-    }
-    if (packageId === "subdomain_addon") {
-      if (!domain) {
-        res
-          .status(400)
-          .json({ error: "Domain is required for subdomain add-ons" });
-        return;
-      }
-      if (!subdomains || subdomains.length === 0) {
-        res
-          .status(400)
-          .json({ error: "At least one subdomain must be selected" });
-        return;
-      }
-    }
-    if (packageId === "single_domain_bundle" && !domain) {
-      res
-        .status(400)
-        .json({
-          error:
-            "Domain (contract or full_time) is required for single domain bundle",
-        });
+    const validationError = validateCandidatePackageInput(
+      packageId,
+      domain,
+      subdomains,
+    );
+    if (validationError) {
+      res.status(400).json({ error: validationError });
       return;
     }
 
@@ -418,166 +424,18 @@ export async function stripeWebhook(
 
   try {
     switch (event.type) {
-      // ── Vendor recurring subscription events ──
       case "customer.subscription.created":
-      case "customer.subscription.updated": {
-        const sub = event.data.object as Stripe.Subscription;
-        const customerId = sub.customer as string;
-
-        const priceId = sub.items.data[0]?.price.id || "";
-
-        // Check marketer plan first
-        let plan: string;
-        if (priceId && priceId === MARKETER_PLAN.stripePriceId) {
-          plan = "marketer";
-        } else {
-          const planDef = VENDOR_PLAN_DEFINITIONS.find(
-            (p) => p.stripePriceId === priceId,
-          );
-          plan = (
-            planDef?.id === "pro_plus"
-              ? "pro_plus"
-              : planDef?.id === "pro"
-                ? "pro"
-                : planDef?.id === "basic"
-                  ? "basic"
-                  : "free"
-          ) as VendorPlan;
-        }
-
-        const status = sub.status as SubStatus;
-        const currentPeriodEnd = new Date(sub.current_period_end * 1000);
-
-        const updatedSub = await prisma.subscription.updateMany({
-          where: { stripeCustomerId: customerId },
-          data: {
-            plan,
-            status,
-            stripeSubId: sub.id,
-            stripePriceId: priceId,
-            currentPeriodEnd,
-          },
-        });
-
-        if (
-          updatedSub.count > 0 &&
-          event.type === "customer.subscription.created"
-        ) {
-          const dbSub = await prisma.subscription.findFirst({
-            where: { stripeCustomerId: customerId },
-          });
-          if (dbSub) {
-            const user = await prisma.user.findUnique({
-              where: { id: dbSub.userId },
-            });
-            if (user) {
-              sendSubscriptionActivatedEmail({
-                to: user.email,
-                firstName: user.firstName || "there",
-                plan,
-                currentPeriodEnd,
-              }).catch(console.error);
-            }
-          }
-        }
+      case "customer.subscription.updated":
+        await handleSubscriptionUpsert(event);
         break;
-      }
 
-      case "customer.subscription.deleted": {
-        const sub = event.data.object as Stripe.Subscription;
-        await prisma.subscription.updateMany({
-          where: { stripeCustomerId: sub.customer as string },
-          data: {
-            plan: "free",
-            status: "canceled",
-            stripeSubId: null,
-            stripePriceId: null,
-            currentPeriodEnd: null,
-          },
-        });
+      case "customer.subscription.deleted":
+        await handleSubscriptionDeleted(event);
         break;
-      }
 
-      // ── Candidate one-time payment event ──
-      case "checkout.session.completed": {
-        const session = event.data.object as Stripe.Checkout.Session;
-
-        // Skip subscription-mode sessions (handled via subscription events above)
-        if (session.mode !== "payment") break;
-
-        const userId = session.metadata?.matchdb_user_id;
-        const packageId = session.metadata?.package_id as
-          | CandidatePackageId
-          | undefined;
-        const domain = session.metadata?.domain || null;
-        const subdomainsRaw = session.metadata?.subdomains || "[]";
-
-        if (!userId || !packageId) {
-          console.error(
-            "[Stripe Webhook] Missing metadata on payment session:",
-            session.id,
-          );
-          break;
-        }
-
-        let subdomains: string[] = [];
-        try {
-          subdomains = JSON.parse(subdomainsRaw) as string[];
-        } catch {
-          subdomains = [];
-        }
-
-        // Idempotency: stripeSessionId is unique; catch P2002 and treat as no-op
-        try {
-          await prisma.candidatePayment.create({
-            data: {
-              userId,
-              stripeSessionId: session.id,
-              stripePaymentIntentId:
-                typeof session.payment_intent === "string"
-                  ? session.payment_intent
-                  : null,
-              packageType: packageId,
-              domain: domain || null,
-              subdomains: JSON.stringify(subdomains),
-              amountCents: session.amount_total || 0,
-              status: "completed",
-            },
-          });
-        } catch (e: any) {
-          if (e?.code === "P2002") {
-            // Already processed (duplicate webhook delivery) — safe to ignore
-            console.log(
-              "[Stripe Webhook] Duplicate session event ignored:",
-              session.id,
-            );
-            break;
-          }
-          throw e;
-        }
-
-        // Recompute full membership config from ALL completed payments for this user
-        const allPayments = await prisma.candidatePayment.findMany({
-          where: { userId, status: "completed" },
-          select: { packageType: true, domain: true, subdomains: true },
-        });
-
-        const newConfig = computeMembershipConfig(allPayments);
-
-        await prisma.user.update({
-          where: { id: userId },
-          data: {
-            membershipConfig: JSON.stringify(newConfig),
-            hasPurchasedVisibility: true,
-          },
-        });
-
-        console.log(
-          `[Stripe Webhook] Candidate visibility updated for user ${userId}:`,
-          newConfig,
-        );
+      case "checkout.session.completed":
+        await handleCheckoutCompleted(event);
         break;
-      }
     }
 
     res.json({ received: true });
@@ -585,4 +443,155 @@ export async function stripeWebhook(
     console.error("[Stripe Webhook] Handler error:", err);
     res.status(500).json({ error: "Webhook processing failed" });
   }
+}
+
+// ─── Webhook event handlers ───────────────────────────────────────────────────
+
+async function handleSubscriptionUpsert(event: Stripe.Event): Promise<void> {
+  const sub = event.data.object as Stripe.Subscription;
+  const customerId = sub.customer as string;
+  const priceId = sub.items.data[0]?.price.id || "";
+
+  let plan: string;
+  if (priceId && priceId === MARKETER_PLAN.stripePriceId) {
+    plan = "marketer";
+  } else {
+    const planDef = VENDOR_PLAN_DEFINITIONS.find(
+      (p) => p.stripePriceId === priceId,
+    );
+    plan = resolvePlanFromDef(planDef);
+  }
+
+  const status = sub.status as SubStatus;
+  const currentPeriodEnd = new Date(sub.current_period_end * 1000);
+
+  const updatedSub = await prisma.subscription.updateMany({
+    where: { stripeCustomerId: customerId },
+    data: {
+      plan,
+      status,
+      stripeSubId: sub.id,
+      stripePriceId: priceId,
+      currentPeriodEnd,
+    },
+  });
+
+  if (updatedSub.count > 0 && event.type === "customer.subscription.created") {
+    await sendActivationEmail(customerId, plan, currentPeriodEnd);
+  }
+}
+
+async function sendActivationEmail(
+  customerId: string,
+  plan: string,
+  currentPeriodEnd: Date,
+): Promise<void> {
+  const dbSub = await prisma.subscription.findFirst({
+    where: { stripeCustomerId: customerId },
+  });
+  if (!dbSub) return;
+
+  const user = await prisma.user.findUnique({
+    where: { id: dbSub.userId },
+  });
+  if (!user) return;
+
+  sendSubscriptionActivatedEmail({
+    to: user.email,
+    firstName: user.firstName || "there",
+    plan,
+    currentPeriodEnd,
+  }).catch(console.error);
+}
+
+async function handleSubscriptionDeleted(event: Stripe.Event): Promise<void> {
+  const sub = event.data.object as Stripe.Subscription;
+  await prisma.subscription.updateMany({
+    where: { stripeCustomerId: sub.customer as string },
+    data: {
+      plan: "free",
+      status: "canceled",
+      stripeSubId: null,
+      stripePriceId: null,
+      currentPeriodEnd: null,
+    },
+  });
+}
+
+async function handleCheckoutCompleted(event: Stripe.Event): Promise<void> {
+  const session = event.data.object as Stripe.Checkout.Session;
+
+  // Skip subscription-mode sessions (handled via subscription events above)
+  if (session.mode !== "payment") return;
+
+  const userId = session.metadata?.matchdb_user_id;
+  const packageId = session.metadata?.package_id as
+    | CandidatePackageId
+    | undefined;
+  const domain = session.metadata?.domain || null;
+  const subdomainsRaw = session.metadata?.subdomains || "[]";
+
+  if (!userId || !packageId) {
+    console.error(
+      "[Stripe Webhook] Missing metadata on payment session:",
+      session.id,
+    );
+    return;
+  }
+
+  let subdomains: string[] = [];
+  try {
+    subdomains = JSON.parse(subdomainsRaw) as string[];
+  } catch {
+    subdomains = [];
+  }
+
+  // Idempotency: stripeSessionId is unique; catch P2002 and treat as no-op
+  try {
+    await prisma.candidatePayment.create({
+      data: {
+        userId,
+        stripeSessionId: session.id,
+        stripePaymentIntentId:
+          typeof session.payment_intent === "string"
+            ? session.payment_intent
+            : null,
+        packageType: packageId,
+        domain: domain || null,
+        subdomains: JSON.stringify(subdomains),
+        amountCents: session.amount_total || 0,
+        status: "completed",
+      },
+    });
+  } catch (e: any) {
+    if (e?.code === "P2002") {
+      console.log(
+        "[Stripe Webhook] Duplicate session event ignored:",
+        session.id,
+      );
+      return;
+    }
+    throw e;
+  }
+
+  // Recompute full membership config from ALL completed payments for this user
+  const allPayments = await prisma.candidatePayment.findMany({
+    where: { userId, status: "completed" },
+    select: { packageType: true, domain: true, subdomains: true },
+  });
+
+  const newConfig = computeMembershipConfig(allPayments);
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      membershipConfig: JSON.stringify(newConfig),
+      hasPurchasedVisibility: true,
+    },
+  });
+
+  console.log(
+    `[Stripe Webhook] Candidate visibility updated for user ${userId}:`,
+    newConfig,
+  );
 }
