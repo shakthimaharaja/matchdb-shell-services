@@ -452,6 +452,41 @@ const options: swaggerJsdoc.Options = {
           },
         },
       },
+      "/payments/marketer-checkout": {
+        post: {
+          tags: ["Payments"],
+          summary: "Create Stripe Checkout session for marketer subscription",
+          security: [{ BearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["priceId"],
+                  properties: {
+                    priceId: { type: "string", description: "Stripe price ID" },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            200: {
+              description: "Checkout session URL",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: { url: { type: "string" } },
+                  },
+                },
+              },
+            },
+            401: { description: "Unauthorized" },
+          },
+        },
+      },
     },
   },
   apis: [], // All paths defined inline above — no file scanning needed

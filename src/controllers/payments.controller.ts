@@ -30,10 +30,7 @@ function resolvePlanFromDef(planDef: { id: string } | undefined): VendorPlan {
   return "free";
 }
 
-// ─── Subdomain constants ──────────────────────────────────────────────────────
-
-const CONTRACT_SUBDOMAINS = ["c2c", "c2h", "w2", "1099"];
-const FULLTIME_SUBDOMAINS = ["c2h", "w2", "direct_hire", "salary"];
+import { CONTRACT_SUBDOMAINS, FULLTIME_SUBDOMAINS } from "../constants";
 
 /**
  * Aggregates all completed CandidatePayment records for a user into a
