@@ -1,6 +1,6 @@
 # matchdb-shell-services
 
-Authentication, OAuth, Payments & Membership backend for the MatchDB staffing platform. **Owns the unified PostgreSQL schema and all database migrations** — jobs-services shares the same database.
+Authentication, OAuth, Payments & Membership backend for the MatchDB staffing platform. Uses **MongoDB Atlas** via Mongoose.
 
 ---
 
@@ -10,7 +10,7 @@ Authentication, OAuth, Payments & Membership backend for the MatchDB staffing pl
 | ---------- | ------------------------------------------------ |
 | Runtime    | Node.js + TypeScript                             |
 | Framework  | Express 4                                        |
-| Database   | PostgreSQL via Prisma 5 ORM                      |
+| Database   | MongoDB Atlas via Mongoose 8                     |
 | Auth       | JWT (access + refresh), bcryptjs, Google OAuth   |
 | OAuth      | Passport.js + passport-google-oauth20            |
 | Payments   | Stripe (subscriptions + one-time candidate pkgs) |
@@ -24,39 +24,42 @@ Authentication, OAuth, Payments & Membership backend for the MatchDB staffing pl
 
 ```
 matchdb-shell-services/
-├── prisma/
-│   ├── schema.prisma          # Full unified schema (12 models — auth + jobs)
-│   └── migrations/            # Prisma migration history (owns all migrations)
-├── src/
-│   ├── index.ts               # Entry point — starts Express server
-│   ├── app.ts                 # Express app (routes, middleware, Swagger)
-│   ├── config/
-│   │   ├── env.ts             # Environment variable loading & validation
-│   │   ├── prisma.ts          # Prisma client singleton
-│   │   ├── passport.ts        # Google OAuth strategy (graceful degradation)
-│   │   └── swagger.ts         # OpenAPI 3.0 spec (all endpoints)
-│   ├── controllers/
-│   │   ├── auth.controller.ts      # Register, login, refresh, verify, logout, delete, OAuth
-│   │   └── payments.controller.ts  # Stripe checkout, webhook, portal, candidate packages
-│   ├── middleware/
-│   │   ├── auth.middleware.ts      # JWT verification guard
-│   │   └── error.middleware.ts     # Global error handler + 404
-│   ├── routes/
-│   │   ├── auth.routes.ts          # /api/auth/*
-│   │   └── payments.routes.ts      # /api/payments/*
-│   ├── scripts/
-│   │   └── seed.ts                 # Full database seed (3 users, 15 jobs, 11 profiles)
-│   ├── services/
-│   │   ├── jwt.service.ts          # Token sign / verify helpers
-│   │   ├── sendgrid.service.ts     # Email dispatch (welcome email on register)
-│   │   └── stripe.service.ts       # Stripe customer, subscription & candidate pkg helpers
-│   └── types/
-│       └── express.d.ts            # Express.User augmentation for req.user typing
-├── env/
-│   └── .env.local             # Local env vars
-├── Dockerfile
-├── package.json
-└── tsconfig.json
++-- src/
+|   +-- index.ts               # Entry point � starts Express server
+|   +-- app.ts                 # Express app (routes, middleware, Swagger)
+|   +-- config/
+|   |   +-- env.ts             # Environment variable loading & validation
+|   |   +-- mongoose.ts        # MongoDB connection (Atlas)
+|   |   +-- passport.ts        # Google OAuth strategy (graceful degradation)
+|   |   +-- swagger.ts         # OpenAPI 3.0 spec (all endpoints)
+|   +-- models/
+|   |   +-- User.ts            # User accounts (candidate/vendor/marketer)
+|   |   +-- Subscription.ts    # Stripe subscription plans
+|   |   +-- RefreshToken.ts    # JWT refresh token registry
+|   |   +-- CandidatePayment.ts # One-time visibility purchases
+|   +-- controllers/
+|   |   +-- auth.controller.ts      # Register, login, refresh, verify, logout, delete, OAuth
+|   |   +-- payments.controller.ts  # Stripe checkout, webhook, portal, candidate packages
+|   +-- middleware/
+|   |   +-- auth.middleware.ts      # JWT verification guard
+|   |   +-- error.middleware.ts     # Global error handler + 404
+|   +-- routes/
+|   |   +-- auth.routes.ts          # /api/auth/*
+|   |   +-- payments.routes.ts      # /api/payments/*
+|   +-- services/
+|   |   +-- jwt.service.ts          # Token sign / verify helpers
+|   |   +-- sendgrid.service.ts     # Email dispatch (welcome email on register)
+|   |   +-- stripe.service.ts       # Stripe customer, subscription & candidate pkg helpers
+|   +-- types/
+|       +-- express.d.ts            # Express.User augmentation for req.user typing
++-- env/
+|   +-- .env.local             # Local env vars
+|   +-- .env.development       # Dev env vars
+|   +-- .env.qa                # QA env vars
+|   +-- .env.production        # Production env vars
++-- Dockerfile
++-- package.json
++-- tsconfig.json
 ```
 
 ---
@@ -73,8 +76,8 @@ matchdb-shell-services/
 | GET    | `/api/auth/verify`          | Yes  | Get current user profile                              |
 | POST   | `/api/auth/logout`          | Yes  | Revoke refresh token                                  |
 | DELETE | `/api/auth/account`         | Yes  | Permanently delete account (cascading)                |
-| GET    | `/api/auth/google`          | No   | Initiate Google OAuth (`?userType=candidate\|vendor`) |
-| GET    | `/api/auth/google/callback` | No   | Google OAuth callback → JWT + redirect                |
+| GET    | `/api/auth/google`          | No   | Initiate Google OAuth                                 |
+| GET    | `/api/auth/google/callback` | No   | Google OAuth callback -> JWT + redirect               |
 
 ### Payments
 
@@ -91,48 +94,19 @@ matchdb-shell-services/
 
 ---
 
-## Database (Unified PostgreSQL)
+## Database (MongoDB Atlas)
 
-This service **owns the schema** for the entire MatchDB platform. Both `matchdb-shell-services` and `matchdb-jobs-services` connect to the same PostgreSQL database.
+This service connects to the `matchdb-shell` database on MongoDB Atlas.
+Schemas are defined as Mongoose models � no migrations needed.
 
-### Schema (12 models)
+### Collections (4 models)
 
-**Auth models (managed here):**
+- **User** � `_id`, `email`, `password?`, `googleId?`, `firstName`, `lastName`, `username`, `userType`, `membershipConfig?`, `hasPurchasedVisibility`, `isActive`
+- **Subscription** � `plan` (free/pro/enterprise), `status`, `stripeCustomerId?`, `stripeSubId?`
+- **RefreshToken** � `token`, `userId`, `expiresAt`, `revoked`
+- **CandidatePayment** � `packageType`, `domain?`, `subdomains`, `amountCents`, `status`
 
-- **User** — `id`, `email`, `password?`, `googleId?`, `firstName`, `lastName`, `username`, `userType` (candidate/vendor/marketer/admin), `membershipConfig?`, `hasPurchasedVisibility`, `isActive`
-- **Subscription** — `plan` (free/basic/pro/pro_plus/enterprise/marketer), `status`, `stripeCustomerId?`, `stripeSubscriptionId?`
-- **RefreshToken** — `token`, `userId`, `expiresAt`, `revoked`
-- **CandidatePayment** — `packageType`, `domain?`, `subdomains`, `amountCents`, `status`
-
-**Jobs models (used by jobs-services):**
-
-- **Job** — `title`, `description`, `vendorId`, `jobType`, `jobSubType`, `skillsRequired[]`, `experienceRequired`, `workMode`, `isActive`
-- **CandidateProfile** — `candidateId`, `username`, `name`, `skills[]`, `visibilityConfig`, `profileLocked`
-- **Application** — `jobId`, `candidateId`, `status`
-- **PokeRecord** — `fromUserId`, `toUserId`, `jobId?`, `message?`
-- **PokeLog** — `userId`, `yearMonth`, `count` (rate-limiting)
-- **Company** — `name`, `marketerId`, `marketerEmail`
-- **MarketerCandidate** — `companyId`, `marketerId`, `candidateId`
-- **ForwardedOpening** — `marketerId`, `candidateId`, `jobId`
-- **CompanyInvite** — `companyId`, `marketerId`, `candidateEmail`, `token`, `status`, `expiresAt`
-- **ProjectFinancial** — `applicationId`, `companyId`, `candidateId`, `billRate`, `payRate`, `hoursPerWeek`, `margin`
-
----
-
-## Seed Data
-
-Run the seed with:
-
-```powershell
-npx tsx src/scripts/seed.ts
-```
-
-Creates:
-
-- **3 users:** `candidate@test.com` / `Test1234!`, `vendor@test.com` / `Test1234!`, `marketer@test.com` / `Marketer123!`
-- **15 jobs** across various tech roles (all owned by the vendor)
-- **11 candidate profiles** (1 linked to the candidate user + 10 browsable)
-- **1 company** ("Elite Staffing Solutions") with 3 rostered candidates
+See [DATABASE-SCHEMA.md](../DATABASE-SCHEMA.md) for the full schema reference.
 
 ---
 
@@ -140,9 +114,9 @@ Creates:
 
 ### Prerequisites
 
-- **Node.js** ≥ 18
-- **npm** ≥ 9
-- **PostgreSQL** running on port 5432
+- **Node.js** >= 18
+- **npm** >= 9
+- **MongoDB Atlas** connection string (configured in env files)
 
 ### Install & Run
 
@@ -150,16 +124,7 @@ Creates:
 # 1. Install dependencies
 npm install
 
-# 2. Generate Prisma client
-npx prisma generate
-
-# 3. Create / migrate the PostgreSQL database
-npx prisma migrate dev
-
-# 4. Seed demo data
-npx tsx src/scripts/seed.ts
-
-# 5. Start the dev server (hot-reload)
+# 2. Start the dev server (hot-reload)
 npm run dev
 ```
 
@@ -169,27 +134,22 @@ The server starts on **http://localhost:8000**.
 
 ## Environment Variables
 
-Create `env/.env.local`:
+Config is loaded from `env/.env.{NODE_ENV}` files. Key variables:
 
 ```env
 PORT=8000
 NODE_ENV=local
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/matchdb
+MONGO_URI=mongodb+srv://...@matchdb.rhutf6s.mongodb.net/matchdb-shell?retryWrites=true&w=majority
 JWT_SECRET=dev-jwt-secret-change-in-production-min-32-chars
 JWT_REFRESH_SECRET=dev-refresh-secret-change-in-production-min-32-chars
 JWT_ACCESS_EXPIRES=1h
 JWT_REFRESH_EXPIRES=7d
-
-# Google OAuth (optional — routes return 501 if unset)
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 GOOGLE_CALLBACK_URL=http://localhost:8000/api/auth/google/callback
-
-# Stripe (optional for local dev)
 STRIPE_SECRET_KEY=
 STRIPE_WEBHOOK_SECRET=
 SENDGRID_API_KEY=
-
 CORS_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:4000,http://localhost:4001
 CLIENT_URL=http://localhost:3000
 ```
@@ -198,16 +158,11 @@ CLIENT_URL=http://localhost:3000
 
 ## Scripts
 
-| Script                    | Description                         |
-| ------------------------- | ----------------------------------- |
-| `npm run dev`             | Start with hot reload (`tsx watch`) |
-| `npm run build`           | Compile TypeScript to `dist/`       |
-| `npm start`               | Run compiled output                 |
-| `npm run prisma:generate` | Regenerate Prisma client            |
-| `npm run prisma:migrate`  | Run database migrations             |
-| `npm run prisma:deploy`   | Deploy migrations (production)      |
-| `npm run prisma:studio`   | Open Prisma Studio GUI (port 5555)  |
-| `npm run prisma:seed`     | Seed database via Prisma            |
+| Script          | Description                         |
+| --------------- | ----------------------------------- |
+| `npm run dev`   | Start with hot reload (`tsx watch`) |
+| `npm run build` | Compile TypeScript to `dist/`       |
+| `npm start`     | Run compiled output                 |
 
 ---
 

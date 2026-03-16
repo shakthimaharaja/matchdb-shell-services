@@ -16,7 +16,7 @@ export const env = {
   PORT: parseInt(process.env.PORT || "8000", 10),
 
   // Database
-  DATABASE_URL: required("DATABASE_URL"),
+  MONGO_URI: required("MONGO_URI"),
 
   // JWT
   JWT_SECRET: required("JWT_SECRET"),

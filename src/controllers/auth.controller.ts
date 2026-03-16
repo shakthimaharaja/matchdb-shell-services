@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import passport from "passport";
-import { prisma } from "../config/prisma";
+import { User, Subscription, RefreshToken, CandidatePayment } from "../models";
 import { googleOAuthEnabled } from "../config/passport";
 import {
   signAccessToken,
@@ -70,7 +70,7 @@ function makeTokens(
 
 async function storeRefreshToken(userId: string, token: string): Promise<void> {
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-  await prisma.refreshToken.create({ data: { token, userId, expiresAt } });
+  await RefreshToken.create({ token, userId, expiresAt });
 }
 
 function userResponse(
@@ -121,9 +121,7 @@ export async function register(
   try {
     const body = registerSchema.parse(req.body);
 
-    const existing = await prisma.user.findUnique({
-      where: { email: body.email },
-    });
+    const existing = await User.findOne({ email: body.email });
     if (existing) {
       const err: AppError = new Error("Email already registered");
       err.statusCode = 409;
@@ -134,52 +132,39 @@ export async function register(
     const newId = crypto.randomUUID();
     const username = generateUsername(body.firstName, body.lastName, newId);
 
-    // Cast to any so TypeScript accepts `username` before `prisma generate` is re-run
-    // after the schema migration. The column exists at runtime via `prisma db push`.
-    const user = (await (prisma.user as any).create({
-      data: {
-        id: newId,
-        email: body.email,
-        password: hashedPassword,
-        firstName: body.firstName,
-        lastName: body.lastName,
-        userType: body.userType,
-        username,
-        hasPurchasedVisibility: false,
-        subscription: {
-          create: { plan: "free", status: "active" },
-        },
+    const user = await User.create({
+      _id: newId,
+      email: body.email,
+      password: hashedPassword,
+      firstName: body.firstName,
+      lastName: body.lastName,
+      userType: body.userType,
+      username,
+      hasPurchasedVisibility: false,
+    });
+
+    // Create subscription
+    await Subscription.create({
+      userId: user._id,
+      plan: "free",
+      status: "active",
+    });
+
+    // Auto-create a Company record for marketer users (in jobs-services DB)
+    // Note: Company model is in jobs-services; marketer company auto-creation
+    // is handled when the marketer first accesses jobs-services.
+
+    const plan = "free";
+    const { access, refresh } = makeTokens(
+      {
+        id: user._id,
+        email: user.email,
+        userType: user.userType,
+        username: user.username,
       },
-      include: { subscription: true },
-    })) as {
-      id: string;
-      email: string;
-      firstName: string | null;
-      lastName: string | null;
-      userType: string;
-      username: string | null;
-      membershipConfig: string | null;
-      hasPurchasedVisibility: boolean;
-      subscription: { plan: string } | null;
-    };
-
-    // Auto-create a Company record for marketer users
-    if (body.userType === "marketer") {
-      const companyName =
-        body.companyName ||
-        `${body.firstName || ""} ${body.lastName || ""}'s Company`.trim();
-      await prisma.company.create({
-        data: {
-          name: companyName,
-          marketerId: user.id,
-          marketerEmail: user.email,
-        },
-      });
-    }
-
-    const plan = user.subscription?.plan || "free";
-    const { access, refresh } = makeTokens(user, plan);
-    await storeRefreshToken(user.id, refresh);
+      plan,
+    );
+    await storeRefreshToken(user._id, refresh);
 
     // Send welcome email (non-blocking)
     sendWelcomeEmail({
@@ -189,7 +174,21 @@ export async function register(
     }).catch(console.error);
 
     res.status(201).json({
-      user: userResponse(user, plan),
+      user: userResponse(
+        {
+          id: user._id,
+          email: user.email,
+          firstName: user.firstName ?? null,
+          lastName: user.lastName ?? null,
+          userType: user.userType,
+          username: user.username,
+          membershipConfig: user.membershipConfig ?? null,
+          hasPurchasedVisibility: user.hasPurchasedVisibility,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
+        },
+        plan,
+      ),
       access,
       refresh,
     });
@@ -215,10 +214,10 @@ export async function login(
   try {
     const body = loginSchema.parse(req.body);
 
-    const user = await prisma.user.findUnique({
-      where: { email: body.email },
-      include: { subscription: true },
-    });
+    const user = await User.findOne({ email: body.email });
+    const subscription = user
+      ? await Subscription.findOne({ userId: user._id })
+      : null;
 
     if (!user?.isActive) {
       const err: AppError = new Error("Invalid email or password");
@@ -242,12 +241,34 @@ export async function login(
       return next(err);
     }
 
-    const plan = user.subscription?.plan || "free";
-    const { access, refresh } = makeTokens(user, plan);
-    await storeRefreshToken(user.id, refresh);
+    const plan = subscription?.plan || "free";
+    const { access, refresh } = makeTokens(
+      {
+        id: user._id,
+        email: user.email,
+        userType: user.userType,
+        username: user.username,
+      },
+      plan,
+    );
+    await storeRefreshToken(user._id, refresh);
 
     res.json({
-      user: userResponse(user, plan),
+      user: userResponse(
+        {
+          id: user._id,
+          email: user.email,
+          firstName: user.firstName ?? null,
+          lastName: user.lastName ?? null,
+          userType: user.userType,
+          username: user.username,
+          membershipConfig: user.membershipConfig ?? null,
+          hasPurchasedVisibility: user.hasPurchasedVisibility,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
+        },
+        plan,
+      ),
       access,
       refresh,
     });
@@ -361,43 +382,39 @@ export async function refreshToken(
 
     const payload = verifyRefreshToken(refresh);
 
-    const stored = await prisma.refreshToken.findUnique({
-      where: { token: refresh },
-    });
+    const stored = await RefreshToken.findOne({ token: refresh });
     if (!stored || stored.revoked || stored.expiresAt < new Date()) {
       res.status(401).json({ error: "Refresh token invalid or expired" });
       return;
     }
 
     // Revoke old token (rotation)
-    await prisma.refreshToken.update({
-      where: { id: stored.id },
-      data: { revoked: true },
-    });
+    stored.revoked = true;
+    await stored.save();
 
-    const user = await prisma.user.findUnique({
-      where: { id: payload.userId },
-      include: { subscription: true },
-    });
+    const user = await User.findById(payload.userId);
+    const subscription = user
+      ? await Subscription.findOne({ userId: user._id })
+      : null;
 
     if (!user?.isActive) {
       res.status(401).json({ error: "User not found or inactive" });
       return;
     }
 
-    const plan = user.subscription?.plan || "free";
+    const plan = subscription?.plan || "free";
     const newAccess = signAccessToken({
-      userId: user.id,
+      userId: user._id,
       email: user.email,
       userType: user.userType,
       plan,
-      username: (user as any).username || "",
+      username: user.username || "",
     });
     const newRefresh = signRefreshToken({
-      userId: user.id,
+      userId: user._id,
       tokenId: crypto.randomUUID(),
     });
-    await storeRefreshToken(user.id, newRefresh);
+    await storeRefreshToken(user._id, newRefresh);
 
     res.json({ access: newAccess, refresh: newRefresh });
   } catch {
@@ -413,18 +430,34 @@ export async function verify(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: req.user!.userId },
-      include: { subscription: true },
-    });
+    const user = await User.findById(req.user!.userId);
+    const subscription = user
+      ? await Subscription.findOne({ userId: user._id })
+      : null;
 
     if (!user?.isActive) {
       res.status(401).json({ error: "User not found" });
       return;
     }
 
-    const plan = user.subscription?.plan || "free";
-    res.json({ user: userResponse(user, plan) });
+    const plan = subscription?.plan || "free";
+    res.json({
+      user: userResponse(
+        {
+          id: user._id,
+          email: user.email,
+          firstName: user.firstName ?? null,
+          lastName: user.lastName ?? null,
+          userType: user.userType,
+          username: user.username,
+          membershipConfig: user.membershipConfig ?? null,
+          hasPurchasedVisibility: user.hasPurchasedVisibility,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
+        },
+        plan,
+      ),
+    });
   } catch (err) {
     next(err);
   }
@@ -438,10 +471,10 @@ export async function logout(
   try {
     const { refresh } = req.body as { refresh?: string };
     if (refresh) {
-      await prisma.refreshToken.updateMany({
-        where: { token: refresh, revoked: false },
-        data: { revoked: true },
-      });
+      await RefreshToken.updateMany(
+        { token: refresh, revoked: false },
+        { revoked: true },
+      );
     }
     res.json({ message: "Logged out successfully" });
   } catch (err) {
@@ -457,8 +490,13 @@ export async function deleteAccount(
   try {
     const userId = req.user!.userId;
 
-    // Cascade-delete removes Subscription, RefreshTokens, and CandidatePayments automatically
-    await prisma.user.delete({ where: { id: userId } });
+    // Delete user and related data
+    await Promise.all([
+      RefreshToken.deleteMany({ userId }),
+      Subscription.deleteMany({ userId }),
+      CandidatePayment.deleteMany({ userId }),
+    ]);
+    await User.deleteOne({ _id: userId });
 
     res.json({ message: "Account deleted permanently" });
   } catch (err) {

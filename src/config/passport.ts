@@ -1,7 +1,23 @@
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
+import crypto from "node:crypto";
 import { env } from "./env";
-import { prisma } from "./prisma";
+import { User, Subscription } from "../models";
+
+/** Generate a URL-safe username slug from an OAuth profile name. */
+function generateUsername(
+  givenName?: string | null,
+  familyName?: string | null,
+): string {
+  const cleanStr = (s?: string | null) =>
+    (s ?? "").toLowerCase().replaceAll(/[^a-z0-9]/g, "");
+  const first = cleanStr(givenName);
+  const last = cleanStr(familyName);
+  const suffix = crypto.randomUUID().replaceAll("-", "").slice(0, 6);
+  if (first && last) return `${first}-${last}-${suffix}`;
+  if (first || last) return `${first || last}-${suffix}`;
+  return `user-${suffix}`;
+}
 
 /**
  * Registers the Google OAuth2 strategy with Passport.
@@ -38,29 +54,32 @@ if (googleOAuthEnabled)
           }
 
           // 1. Returning Google OAuth user — find by googleId
-          const existingByGoogleId = await prisma.user.findUnique({
-            where: { googleId: profile.id },
-            include: { subscription: true },
+          const existingByGoogleId = await User.findOne({
+            googleId: profile.id,
           });
           if (existingByGoogleId) {
-            return done(null, existingByGoogleId as any);
+            const sub = await Subscription.findOne({
+              userId: existingByGoogleId._id,
+            });
+            const userObj = existingByGoogleId.toObject();
+            (userObj as any).subscription = sub ? sub.toObject() : null;
+            return done(null, userObj as any);
           }
 
           // 2. Existing email/password user — link Google account
-          const existingByEmail = await prisma.user.findUnique({
-            where: { email },
-            include: { subscription: true },
-          });
+          const existingByEmail = await User.findOne({ email });
           if (existingByEmail) {
             if (!existingByEmail.isActive) {
               return done(new Error("Account is deactivated."));
             }
-            const linked = await prisma.user.update({
-              where: { id: existingByEmail.id },
-              data: { googleId: profile.id },
-              include: { subscription: true },
+            existingByEmail.googleId = profile.id;
+            await existingByEmail.save();
+            const sub = await Subscription.findOne({
+              userId: existingByEmail._id,
             });
-            return done(null, linked as any);
+            const userObj = existingByEmail.toObject();
+            (userObj as any).subscription = sub ? sub.toObject() : null;
+            return done(null, userObj as any);
           }
 
           // 3. New user via Google OAuth
@@ -70,43 +89,36 @@ if (googleOAuthEnabled)
             ? "vendor"
             : "candidate";
 
-          // Generate URL-safe username slug (same logic as email/password registration)
+          // Generate URL-safe username slug
           const newId = crypto.randomUUID();
-          const cleanStr = (s?: string | null) =>
-            (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-          const first = cleanStr(profile.name?.givenName);
-          const last = cleanStr(profile.name?.familyName);
-          const suffix = newId.replace(/-/g, "").slice(0, 6);
-          const username =
-            first && last
-              ? `${first}-${last}-${suffix}`
-              : first || last
-                ? `${first || last}-${suffix}`
-                : `user-${suffix}`;
+          const username = generateUsername(
+            profile.name?.givenName,
+            profile.name?.familyName,
+          );
 
-          const newUser = await prisma.user.create({
-            data: {
-              id: newId,
-              email,
-              googleId: profile.id,
-              // password is null — Google OAuth users have no password
-              firstName: profile.name?.givenName || null,
-              lastName: profile.name?.familyName || null,
-              userType,
-              username,
-              hasPurchasedVisibility: false,
-              isActive: true,
-              subscription: {
-                create: {
-                  plan: "free",
-                  status: "active",
-                },
-              },
-            },
-            include: { subscription: true },
+          const newUser = await User.create({
+            _id: newId,
+            email,
+            googleId: profile.id,
+            firstName: profile.name?.givenName || null,
+            lastName: profile.name?.familyName || null,
+            userType,
+            username,
+            hasPurchasedVisibility: false,
+            isActive: true,
           });
 
-          return done(null, newUser as any);
+          await Subscription.create({
+            userId: newUser._id,
+            plan: "free",
+            status: "active",
+          });
+
+          const sub = await Subscription.findOne({ userId: newUser._id });
+          const userObj = newUser.toObject();
+          (userObj as any).subscription = sub ? sub.toObject() : null;
+
+          return done(null, userObj as any);
         } catch (err) {
           return done(err as Error);
         }

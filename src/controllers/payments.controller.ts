@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import Stripe from "stripe";
-import { prisma } from "../config/prisma";
+import { User, Subscription, CandidatePayment } from "../models";
 import {
   stripe,
   VENDOR_PLAN_DEFINITIONS,
@@ -15,7 +15,7 @@ import {
 import { sendSubscriptionActivatedEmail } from "../services/sendgrid.service";
 import { env } from "../config/env";
 
-// SQLite doesn't support Prisma enums — define locally
+// Define plan and status types locally
 type VendorPlan = "free" | "basic" | "pro" | "pro_plus" | "marketer";
 type SubStatus = "active" | "inactive" | "trialing" | "canceled" | "past_due";
 
@@ -119,10 +119,8 @@ export async function getSubscription(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const sub = await prisma.subscription.findUnique({
-      where: { userId: req.user!.userId },
-    });
-    res.json({ subscription: sub || { plan: "free", status: "active" } });
+    const sub = await Subscription.findOne({ userId: req.user!.userId });
+    res.json({ subscription: sub ?? { plan: "free", status: "active" } });
   } catch (err) {
     next(err);
   }
@@ -144,10 +142,10 @@ export async function createCheckout(
       return;
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: req.user!.userId },
-      include: { subscription: true },
-    });
+    const user = await User.findById(req.user!.userId);
+    const subscription = user
+      ? await Subscription.findOne({ userId: user._id })
+      : null;
     if (!user) {
       res.status(404).json({ error: "User not found" });
       return;
@@ -160,23 +158,18 @@ export async function createCheckout(
     }
 
     // Create or retrieve Stripe customer
-    let stripeCustomerId = user.subscription?.stripeCustomerId;
+    let stripeCustomerId = subscription?.stripeCustomerId;
     if (!stripeCustomerId) {
       stripeCustomerId = await createOrGetStripeCustomer(
-        user.id,
+        user._id,
         user.email,
         `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email,
       );
-      await prisma.subscription.upsert({
-        where: { userId: user.id },
-        create: {
-          userId: user.id,
-          stripeCustomerId,
-          plan: "free",
-          status: "active",
-        },
-        update: { stripeCustomerId },
-      });
+      await Subscription.findOneAndUpdate(
+        { userId: user._id },
+        { userId: user._id, stripeCustomerId, plan: "free", status: "active" },
+        { upsert: true, new: true },
+      );
     }
 
     const url = await createCheckoutSession({
@@ -184,7 +177,7 @@ export async function createCheckout(
       stripePriceId: plan.stripePriceId,
       successUrl: `${env.CLIENT_URL}/?success=true`,
       cancelUrl: `${env.CLIENT_URL}/?canceled=true`,
-      userId: user.id,
+      userId: user._id,
     });
 
     res.json({ url });
@@ -252,10 +245,10 @@ export async function createCandidateCheckout(
       return;
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: req.user!.userId },
-      include: { subscription: true },
-    });
+    const user = await User.findById(req.user!.userId);
+    const subscription = user
+      ? await Subscription.findOne({ userId: user._id })
+      : null;
     if (!user) {
       res.status(404).json({ error: "User not found" });
       return;
@@ -268,23 +261,18 @@ export async function createCandidateCheckout(
     }
 
     // Create or retrieve Stripe customer
-    let stripeCustomerId = user.subscription?.stripeCustomerId;
+    let stripeCustomerId = subscription?.stripeCustomerId;
     if (!stripeCustomerId) {
       stripeCustomerId = await createOrGetStripeCustomer(
-        user.id,
+        user._id,
         user.email,
         `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email,
       );
-      await prisma.subscription.upsert({
-        where: { userId: user.id },
-        create: {
-          userId: user.id,
-          stripeCustomerId,
-          plan: "free",
-          status: "active",
-        },
-        update: { stripeCustomerId },
-      });
+      await Subscription.findOneAndUpdate(
+        { userId: user._id },
+        { userId: user._id, stripeCustomerId, plan: "free", status: "active" },
+        { upsert: true, new: true },
+      );
     }
 
     // For addon: quantity = number of subdomains (each costs $2)
@@ -299,7 +287,7 @@ export async function createCandidateCheckout(
       quantity,
       successUrl: `${env.CLIENT_URL}/?candidate_success=true`,
       cancelUrl: `${env.CLIENT_URL}/?canceled=true`,
-      userId: user.id,
+      userId: user._id,
       metadata: {
         package_id: packageId,
         domain: resolvedDomain,
@@ -327,10 +315,10 @@ export async function createMarketerCheckout(
       return;
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: req.user!.userId },
-      include: { subscription: true },
-    });
+    const user = await User.findById(req.user!.userId);
+    const subscription = user
+      ? await Subscription.findOne({ userId: user._id })
+      : null;
     if (!user) {
       res.status(404).json({ error: "User not found" });
       return;
@@ -340,23 +328,23 @@ export async function createMarketerCheckout(
       return;
     }
 
-    let stripeCustomerId = user.subscription?.stripeCustomerId;
+    let stripeCustomerId = subscription?.stripeCustomerId;
     if (!stripeCustomerId) {
       stripeCustomerId = await createOrGetStripeCustomer(
-        user.id,
+        user._id,
         user.email,
         `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email,
       );
-      await prisma.subscription.upsert({
-        where: { userId: user.id },
-        create: {
-          userId: user.id,
+      await Subscription.findOneAndUpdate(
+        { userId: user._id },
+        {
+          userId: user._id,
           stripeCustomerId,
           plan: "free",
           status: "inactive",
         },
-        update: { stripeCustomerId },
-      });
+        { upsert: true, new: true },
+      );
     }
 
     const url = await createCheckoutSession({
@@ -364,7 +352,7 @@ export async function createMarketerCheckout(
       stripePriceId: MARKETER_PLAN.stripePriceId,
       successUrl: `${env.CLIENT_URL}/?success=true`,
       cancelUrl: `${env.CLIENT_URL}/?canceled=true`,
-      userId: user.id,
+      userId: user._id,
     });
 
     res.json({ url });
@@ -381,9 +369,7 @@ export async function createPortal(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const sub = await prisma.subscription.findUnique({
-      where: { userId: req.user!.userId },
-    });
+    const sub = await Subscription.findOne({ userId: req.user!.userId });
     if (!sub?.stripeCustomerId) {
       res
         .status(400)
@@ -465,18 +451,21 @@ async function handleSubscriptionUpsert(event: Stripe.Event): Promise<void> {
   const status = sub.status as SubStatus;
   const currentPeriodEnd = new Date(sub.current_period_end * 1000);
 
-  const updatedSub = await prisma.subscription.updateMany({
-    where: { stripeCustomerId: customerId },
-    data: {
+  const updatedSub = await Subscription.updateMany(
+    { stripeCustomerId: customerId },
+    {
       plan,
       status,
       stripeSubId: sub.id,
       stripePriceId: priceId,
       currentPeriodEnd,
     },
-  });
+  );
 
-  if (updatedSub.count > 0 && event.type === "customer.subscription.created") {
+  if (
+    updatedSub.modifiedCount > 0 &&
+    event.type === "customer.subscription.created"
+  ) {
     await sendActivationEmail(customerId, plan, currentPeriodEnd);
   }
 }
@@ -486,14 +475,10 @@ async function sendActivationEmail(
   plan: string,
   currentPeriodEnd: Date,
 ): Promise<void> {
-  const dbSub = await prisma.subscription.findFirst({
-    where: { stripeCustomerId: customerId },
-  });
+  const dbSub = await Subscription.findOne({ stripeCustomerId: customerId });
   if (!dbSub) return;
 
-  const user = await prisma.user.findUnique({
-    where: { id: dbSub.userId },
-  });
+  const user = await User.findById(dbSub.userId);
   if (!user) return;
 
   sendSubscriptionActivatedEmail({
@@ -506,16 +491,16 @@ async function sendActivationEmail(
 
 async function handleSubscriptionDeleted(event: Stripe.Event): Promise<void> {
   const sub = event.data.object as Stripe.Subscription;
-  await prisma.subscription.updateMany({
-    where: { stripeCustomerId: sub.customer as string },
-    data: {
+  await Subscription.updateMany(
+    { stripeCustomerId: sub.customer as string },
+    {
       plan: "free",
       status: "canceled",
       stripeSubId: null,
       stripePriceId: null,
       currentPeriodEnd: null,
     },
-  });
+  );
 }
 
 async function handleCheckoutCompleted(event: Stripe.Event): Promise<void> {
@@ -546,25 +531,23 @@ async function handleCheckoutCompleted(event: Stripe.Event): Promise<void> {
     subdomains = [];
   }
 
-  // Idempotency: stripeSessionId is unique; catch P2002 and treat as no-op
+  // Idempotency: stripeSessionId is unique; catch duplicate key and treat as no-op
   try {
-    await prisma.candidatePayment.create({
-      data: {
-        userId,
-        stripeSessionId: session.id,
-        stripePaymentIntentId:
-          typeof session.payment_intent === "string"
-            ? session.payment_intent
-            : null,
-        packageType: packageId,
-        domain: domain || null,
-        subdomains: JSON.stringify(subdomains),
-        amountCents: session.amount_total || 0,
-        status: "completed",
-      },
+    await CandidatePayment.create({
+      userId,
+      stripeSessionId: session.id,
+      stripePaymentIntentId:
+        typeof session.payment_intent === "string"
+          ? session.payment_intent
+          : null,
+      packageType: packageId,
+      domain: domain || null,
+      subdomains: JSON.stringify(subdomains),
+      amountCents: session.amount_total || 0,
+      status: "completed",
     });
   } catch (e: any) {
-    if (e?.code === "P2002") {
+    if (e?.code === 11000) {
       console.log(
         "[Stripe Webhook] Duplicate session event ignored:",
         session.id,
@@ -575,20 +558,20 @@ async function handleCheckoutCompleted(event: Stripe.Event): Promise<void> {
   }
 
   // Recompute full membership config from ALL completed payments for this user
-  const allPayments = await prisma.candidatePayment.findMany({
-    where: { userId, status: "completed" },
-    select: { packageType: true, domain: true, subdomains: true },
-  });
+  const allPayments = await CandidatePayment.find(
+    { userId, status: "completed" },
+    { packageType: 1, domain: 1, subdomains: 1 },
+  ).lean();
 
-  const newConfig = computeMembershipConfig(allPayments);
+  const newConfig = computeMembershipConfig(allPayments as any);
 
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
+  await User.updateOne(
+    { _id: userId },
+    {
       membershipConfig: JSON.stringify(newConfig),
       hasPurchasedVisibility: true,
     },
-  });
+  );
 
   console.log(
     `[Stripe Webhook] Candidate visibility updated for user ${userId}:`,
