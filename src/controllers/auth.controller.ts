@@ -13,6 +13,10 @@ import { sendWelcomeEmail } from "../services/sendgrid.service";
 import { AppError } from "../middleware/error.middleware";
 import { env } from "../config/env";
 
+// In-memory nonce store for OAuth CSRF protection (TTL: 10 minutes)
+const oauthNonces = new Map<string, number>();
+const NONCE_TTL_MS = 10 * 60 * 1000;
+
 const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8, "Password must be at least 8 characters"),
@@ -251,6 +255,8 @@ export async function login(
       },
       plan,
     );
+    // Revoke all existing refresh tokens on new login to limit exposure of stolen tokens
+    await RefreshToken.deleteMany({ userId: user._id });
     await storeRefreshToken(user._id, refresh);
 
     res.json({
@@ -307,7 +313,9 @@ export function googleAuth(
   };
   const userType = USER_TYPE_MAP[qt] || "candidate";
   // State encodes userType so the callback can read it; nonce prevents CSRF
-  const state = `${userType}:${crypto.randomUUID()}`;
+  const nonce = crypto.randomUUID();
+  oauthNonces.set(nonce, Date.now());
+  const state = `${userType}:${nonce}`;
 
   passport.authenticate("google", {
     scope: ["profile", "email"],
@@ -329,6 +337,16 @@ export function googleCallback(
     return res.redirect(
       `${env.CLIENT_URL}/login?oauth_error=not_configured`,
     ) as any;
+  }
+  // Validate OAuth state nonce to prevent CSRF
+  const stateParam = req.query.state as string | undefined;
+  if (stateParam) {
+    const nonce = stateParam.split(":")[1];
+    const ts = nonce ? oauthNonces.get(nonce) : undefined;
+    if (!ts || Date.now() - ts > NONCE_TTL_MS) {
+      return res.redirect(`${env.CLIENT_URL}/login?oauth_error=invalid_state`) as any;
+    }
+    oauthNonces.delete(nonce);
   }
   passport.authenticate(
     "google",

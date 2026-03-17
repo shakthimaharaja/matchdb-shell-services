@@ -2,6 +2,7 @@ import express from "express";
 import compression from "compression";
 import cors from "cors";
 import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import passport from "passport";
 import swaggerUi from "swagger-ui-express";
 import { env } from "./config/env";
@@ -12,6 +13,9 @@ import paymentsRoutes from "./routes/payments.routes";
 import { errorHandler, notFound } from "./middleware/error.middleware";
 
 const app = express();
+
+const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100, standardHeaders: true, legacyHeaders: false });
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false });
 
 // Gzip compression — reduces API response size 60-80%
 app.use(compression());
@@ -31,6 +35,10 @@ app.use(
 
 // Passport (stateless — no session middleware needed)
 app.use(passport.initialize());
+
+// Rate limiting
+app.use("/api/auth", authLimiter);
+app.use(limiter);
 
 // Stripe webhook must come BEFORE express.json() (needs raw body)
 // It is self-contained in payments.routes with its own raw body parser
