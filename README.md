@@ -6,18 +6,18 @@ Authentication, OAuth, Payments & Membership backend for the MatchDB staffing pl
 
 ## Tech Stack
 
-| Layer      | Technology                                       |
-| ---------- | ------------------------------------------------ |
-| Runtime    | Node.js + TypeScript                             |
-| Framework  | Express 4                                        |
-| Database   | MongoDB Atlas via Mongoose 8                     |
-| Auth       | JWT (access + refresh), bcryptjs, Google OAuth   |
-| OAuth      | Passport.js + passport-google-oauth20            |
-| Payments   | Stripe (subscriptions + one-time candidate pkgs) |
-| Email      | SendGrid                                         |
-| Validation | Zod                                              |
-| Security   | Helmet, CORS, compression                        |
-| Gateway    | http-proxy-middleware (forwards /api/jobs/* to jobs-services) |
+| Layer      | Technology                                                     |
+| ---------- | -------------------------------------------------------------- |
+| Runtime    | Node.js + TypeScript                                           |
+| Framework  | Express 4                                                      |
+| Database   | MongoDB Atlas via Mongoose 8                                   |
+| Auth       | JWT (access + refresh), bcryptjs, Google OAuth                 |
+| OAuth      | Passport.js + passport-google-oauth20                          |
+| Payments   | Stripe (subscriptions + one-time candidate pkgs)               |
+| Email      | SendGrid                                                       |
+| Validation | Zod                                                            |
+| Security   | Helmet, CORS, compression                                      |
+| Gateway    | http-proxy-middleware (forwards /api/jobs/\* to jobs-services) |
 
 ---
 
