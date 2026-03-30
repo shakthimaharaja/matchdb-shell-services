@@ -1,5 +1,11 @@
 import mongoose, { Schema } from "mongoose";
 
+export interface IUserPreferences {
+  themeMode: "legacy" | "classic" | "modern";
+  colorScheme: "light" | "dark" | "auto";
+  textSize: "small" | "medium" | "large";
+}
+
 export interface IUser {
   _id: string;
   email: string;
@@ -12,9 +18,31 @@ export interface IUser {
   membershipConfig?: string;
   hasPurchasedVisibility: boolean;
   isActive: boolean;
+  preferences: IUserPreferences;
   createdAt: Date;
   updatedAt: Date;
 }
+
+const PreferencesSchema = new Schema<IUserPreferences>(
+  {
+    themeMode: {
+      type: String,
+      enum: ["legacy", "classic", "modern"],
+      default: "legacy",
+    },
+    colorScheme: {
+      type: String,
+      enum: ["light", "dark", "auto"],
+      default: "light",
+    },
+    textSize: {
+      type: String,
+      enum: ["small", "medium", "large"],
+      default: "medium",
+    },
+  },
+  { _id: false },
+);
 
 const UserSchema = new Schema<IUser>(
   {
@@ -32,6 +60,14 @@ const UserSchema = new Schema<IUser>(
     membershipConfig: { type: String, default: null },
     hasPurchasedVisibility: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true },
+    preferences: {
+      type: PreferencesSchema,
+      default: () => ({
+        themeMode: "legacy",
+        colorScheme: "light",
+        textSize: "medium",
+      }),
+    },
   },
   { timestamps: true },
 );

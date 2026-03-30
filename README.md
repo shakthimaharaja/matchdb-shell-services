@@ -1,6 +1,6 @@
 # matchdb-shell-services
 
-Authentication, OAuth, Payments & Membership backend for the MatchDB staffing platform. Uses **MongoDB Atlas** via Mongoose.
+Authentication, OAuth, Payments & Membership backend for the MatchDB staffing platform. Also serves as the **API gateway** — all `/api/jobs/*` requests are forwarded to `matchdb-jobs-services` via `http-proxy-middleware`, so frontend UIs only need to know about a single backend origin. Uses **MongoDB Atlas** via Mongoose.
 
 ---
 
@@ -17,6 +17,7 @@ Authentication, OAuth, Payments & Membership backend for the MatchDB staffing pl
 | Email      | SendGrid                                         |
 | Validation | Zod                                              |
 | Security   | Helmet, CORS, compression                        |
+| Gateway    | http-proxy-middleware (forwards /api/jobs/* to jobs-services) |
 
 ---
 
@@ -169,8 +170,9 @@ GOOGLE_CALLBACK_URL=http://localhost:8000/api/auth/google/callback
 STRIPE_SECRET_KEY=
 STRIPE_WEBHOOK_SECRET=
 SENDGRID_API_KEY=
-CORS_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:4000,http://localhost:4001
+CORS_ORIGINS=http://localhost:3000,http://localhost:3001
 CLIENT_URL=http://localhost:3000
+JOBS_SERVICES_URL=http://localhost:8001
 ```
 
 ---

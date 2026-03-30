@@ -57,6 +57,9 @@ export const env = {
   // App
   CLIENT_URL: process.env.CLIENT_URL || "http://localhost:3000",
   CORS_ORIGINS: (
-    process.env.CORS_ORIGINS || "http://localhost:3000,http://localhost:4000"
+    process.env.CORS_ORIGINS || "http://localhost:3000,http://localhost:3001"
   ).split(","),
+
+  // Gateway — proxy /api/jobs to jobs-services
+  JOBS_SERVICES_URL: process.env.JOBS_SERVICES_URL || "http://localhost:8001",
 };
