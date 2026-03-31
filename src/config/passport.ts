@@ -83,10 +83,10 @@ if (googleOAuthEnabled)
           }
 
           // 3. New user via Google OAuth
-          // userType is encoded in the state param as "candidate:nonce" or "vendor:nonce"
+          // userType is encoded in the state param as "candidate:nonce" or "employer:nonce"
           const stateParam = (req.query.state as string) || "";
-          const userType = stateParam.startsWith("vendor")
-            ? "vendor"
+          const userType = stateParam.startsWith("employer")
+            ? "employer"
             : "candidate";
 
           // Generate URL-safe username slug

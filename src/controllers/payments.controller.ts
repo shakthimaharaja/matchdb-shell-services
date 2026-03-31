@@ -16,16 +16,16 @@ import { sendSubscriptionActivatedEmail } from "../services/sendgrid.service";
 import { env } from "../config/env";
 
 // Define plan and status types locally
-type VendorPlan = "free" | "basic" | "pro" | "pro_plus" | "marketer";
+type EmployerPlan = "free" | "basic" | "pro" | "pro_plus";
 type SubStatus = "active" | "inactive" | "trialing" | "canceled" | "past_due";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const VALID_VENDOR_PLANS = new Set<string>(["pro_plus", "pro", "basic"]);
+const VALID_EMPLOYER_PLANS = new Set<string>(["pro_plus", "pro", "basic"]);
 
-function resolvePlanFromDef(planDef: { id: string } | undefined): VendorPlan {
-  if (planDef && VALID_VENDOR_PLANS.has(planDef.id)) {
-    return planDef.id as VendorPlan;
+function resolvePlanFromDef(planDef: { id: string } | undefined): EmployerPlan {
+  if (planDef && VALID_EMPLOYER_PLANS.has(planDef.id)) {
+    return planDef.id as EmployerPlan;
   }
   return "free";
 }
@@ -147,10 +147,10 @@ export async function createCheckout(
       res.status(404).json({ error: "User not found" });
       return;
     }
-    if (user.userType !== "vendor") {
-      res
-        .status(403)
-        .json({ error: "Vendor account required for subscription plans" });
+    if (user.userType !== "employer") {
+      res.status(403).json({
+        error: "Employer account required for subscription plans",
+      });
       return;
     }
 
@@ -320,8 +320,8 @@ export async function createMarketerCheckout(
       res.status(404).json({ error: "User not found" });
       return;
     }
-    if (user.userType !== "marketer") {
-      res.status(403).json({ error: "Marketer account required" });
+    if (user.userType !== "employer") {
+      res.status(403).json({ error: "Employer account required" });
       return;
     }
 

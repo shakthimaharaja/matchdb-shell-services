@@ -22,7 +22,7 @@ const registerSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
-  userType: z.enum(["candidate", "vendor", "marketer"]),
+  userType: z.enum(["candidate", "employer"]),
   companyName: z.string().optional(),
 });
 
@@ -174,7 +174,7 @@ export async function register(
     sendWelcomeEmail({
       to: user.email,
       firstName: user.firstName || "there",
-      userType: user.userType === "vendor" ? "vendor" : "candidate",
+      userType: user.userType === "employer" ? "vendor" : "candidate",
     }).catch(console.error);
 
     res.status(201).json({
@@ -307,11 +307,7 @@ export function googleAuth(
     return;
   }
   const qt = req.query.userType as string;
-  const USER_TYPE_MAP: Record<string, string> = {
-    vendor: "vendor",
-    marketer: "marketer",
-  };
-  const userType = USER_TYPE_MAP[qt] || "candidate";
+  const userType = qt === "employer" ? "employer" : "candidate";
   // State encodes userType so the callback can read it; nonce prevents CSRF
   const nonce = crypto.randomUUID();
   oauthNonces.set(nonce, Date.now());
@@ -344,7 +340,9 @@ export function googleCallback(
     const nonce = stateParam.split(":")[1];
     const ts = nonce ? oauthNonces.get(nonce) : undefined;
     if (!ts || Date.now() - ts > NONCE_TTL_MS) {
-      return res.redirect(`${env.CLIENT_URL}/login?oauth_error=invalid_state`) as any;
+      return res.redirect(
+        `${env.CLIENT_URL}/login?oauth_error=invalid_state`,
+      ) as any;
     }
     oauthNonces.delete(nonce);
   }
