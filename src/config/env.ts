@@ -13,7 +13,7 @@ function required(key: string): string {
 
 export const env = {
   NODE_ENV: ENV,
-  PORT: parseInt(process.env.PORT || "8000", 10),
+  PORT: Number.parseInt(process.env.PORT || "8000", 10),
 
   // Database
   MONGO_URI: required("MONGO_URI"),

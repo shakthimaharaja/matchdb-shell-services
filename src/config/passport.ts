@@ -62,8 +62,11 @@ if (googleOAuthEnabled)
               userId: existingByGoogleId._id,
             });
             const userObj = existingByGoogleId.toObject();
-            (userObj as any).subscription = sub ? sub.toObject() : null;
-            return done(null, userObj as any);
+            const enriched = {
+              ...userObj,
+              subscription: sub ? sub.toObject() : null,
+            };
+            return done(null, enriched as unknown as Express.User);
           }
 
           // 2. Existing email/password user — link Google account
@@ -78,8 +81,11 @@ if (googleOAuthEnabled)
               userId: existingByEmail._id,
             });
             const userObj = existingByEmail.toObject();
-            (userObj as any).subscription = sub ? sub.toObject() : null;
-            return done(null, userObj as any);
+            const enriched = {
+              ...userObj,
+              subscription: sub ? sub.toObject() : null,
+            };
+            return done(null, enriched as unknown as Express.User);
           }
 
           // 3. New user via Google OAuth
@@ -116,9 +122,12 @@ if (googleOAuthEnabled)
 
           const sub = await Subscription.findOne({ userId: newUser._id });
           const userObj = newUser.toObject();
-          (userObj as any).subscription = sub ? sub.toObject() : null;
+          const enriched = {
+            ...userObj,
+            subscription: sub ? sub.toObject() : null,
+          };
 
-          return done(null, userObj as any);
+          return done(null, enriched as unknown as Express.User);
         } catch (err) {
           return done(err as Error);
         }

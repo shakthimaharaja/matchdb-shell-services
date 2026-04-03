@@ -330,9 +330,8 @@ export function googleCallback(
   next: NextFunction,
 ): void {
   if (!googleOAuthEnabled) {
-    return res.redirect(
-      `${env.CLIENT_URL}/login?oauth_error=not_configured`,
-    ) as any;
+    res.redirect(`${env.CLIENT_URL}/login?oauth_error=not_configured`);
+    return;
   }
   // Validate OAuth state nonce to prevent CSRF
   const stateParam = req.query.state as string | undefined;
@@ -340,16 +339,30 @@ export function googleCallback(
     const nonce = stateParam.split(":")[1];
     const ts = nonce ? oauthNonces.get(nonce) : undefined;
     if (!ts || Date.now() - ts > NONCE_TTL_MS) {
-      return res.redirect(
-        `${env.CLIENT_URL}/login?oauth_error=invalid_state`,
-      ) as any;
+      res.redirect(`${env.CLIENT_URL}/login?oauth_error=invalid_state`);
+      return;
     }
     oauthNonces.delete(nonce);
   }
   passport.authenticate(
     "google",
     { session: false },
-    async (err: Error | null, user: any) => {
+    async (
+      err: Error | null,
+      user: {
+        id: string;
+        email: string;
+        userType: string;
+        username?: string | null;
+        firstName: string | null;
+        lastName: string | null;
+        membershipConfig: string | null;
+        hasPurchasedVisibility: boolean;
+        subscription?: { plan?: string } | null;
+        createdAt?: Date;
+        updatedAt?: Date;
+      },
+    ) => {
       if (err || !user) {
         const msg = err?.message || "Google authentication failed";
         console.error("[Google OAuth] Error:", msg);

@@ -543,8 +543,8 @@ async function handleCheckoutCompleted(event: Stripe.Event): Promise<void> {
       amountCents: session.amount_total || 0,
       status: "completed",
     });
-  } catch (e: any) {
-    if (e?.code === 11000) {
+  } catch (e) {
+    if ((e as { code?: number })?.code === 11000) {
       console.log(
         "[Stripe Webhook] Duplicate session event ignored:",
         session.id,
@@ -560,7 +560,13 @@ async function handleCheckoutCompleted(event: Stripe.Event): Promise<void> {
     { packageType: 1, domain: 1, subdomains: 1 },
   ).lean();
 
-  const newConfig = computeMembershipConfig(allPayments as any);
+  const newConfig = computeMembershipConfig(
+    allPayments as Array<{
+      packageType: string;
+      domain: string | null;
+      subdomains: string;
+    }>,
+  );
 
   await User.updateOne(
     { _id: userId },
