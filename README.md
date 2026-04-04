@@ -1,6 +1,6 @@
 # matchdb-shell-services
 
-Authentication, OAuth, Payments & Membership backend for the MatchDB staffing platform. Also serves as the **API gateway** — all `/api/jobs/*` requests are forwarded to `matchdb-jobs-services` via `http-proxy-middleware`, so frontend UIs only need to know about a single backend origin. Uses **MongoDB Atlas** via Mongoose.
+Authentication, OAuth, Payments & Membership backend for the MatchingDB staffing platform. Also serves as the **API gateway** — all `/api/jobs/*` requests are forwarded to `matchdb-jobs-services` via `http-proxy-middleware`, so frontend UIs only need to know about a single backend origin. Uses **MongoDB Atlas** via Mongoose.
 
 ---
 
@@ -159,7 +159,7 @@ Config is loaded from `env/.env.{NODE_ENV}` files. Key variables:
 ```env
 PORT=8000
 NODE_ENV=local
-MONGO_URI=mongodb+srv://...@matchdb.rhutf6s.mongodb.net/matchdb-shell?retryWrites=true&w=majority
+MONGO_URI=mongodb+srv://...@matchingdb.mrumkpb.mongodb.net/matchdb-shell?retryWrites=true&w=majority
 JWT_SECRET=dev-jwt-secret-change-in-production-min-32-chars
 JWT_REFRESH_SECRET=dev-refresh-secret-change-in-production-min-32-chars
 JWT_ACCESS_EXPIRES=1h

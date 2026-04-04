@@ -51,8 +51,9 @@ export const env = {
 
   // SendGrid
   SENDGRID_API_KEY: process.env.SENDGRID_API_KEY || "",
-  SENDGRID_FROM_EMAIL: process.env.SENDGRID_FROM_EMAIL || "noreply@matchdb.io",
-  SENDGRID_FROM_NAME: process.env.SENDGRID_FROM_NAME || "MatchDB",
+  SENDGRID_FROM_EMAIL:
+    process.env.SENDGRID_FROM_EMAIL || "noreply@matchingdb.io",
+  SENDGRID_FROM_NAME: process.env.SENDGRID_FROM_NAME || "MatchingDB",
 
   // App
   CLIENT_URL: process.env.CLIENT_URL || "http://localhost:3000",

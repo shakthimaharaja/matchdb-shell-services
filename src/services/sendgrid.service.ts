@@ -36,7 +36,7 @@ export async function sendWelcomeEmail({
   await sgMail.send({
     to,
     from: { email: env.SENDGRID_FROM_EMAIL, name: env.SENDGRID_FROM_NAME },
-    subject: "Welcome to MatchDB!",
+    subject: "Welcome to MatchingDB!",
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background: linear-gradient(135deg, #1d4479 0%, #3b6fa6 100%); padding: 24px; text-align: center;">
@@ -73,7 +73,7 @@ export async function sendSubscriptionActivatedEmail({
   await sgMail.send({
     to,
     from: { email: env.SENDGRID_FROM_EMAIL, name: env.SENDGRID_FROM_NAME },
-    subject: `Your MatchDB ${plan.toUpperCase()} plan is now active`,
+    subject: `Your MatchingDB ${plan.toUpperCase()} plan is now active`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background: linear-gradient(135deg, #1d4479 0%, #3b6fa6 100%); padding: 24px; text-align: center;">

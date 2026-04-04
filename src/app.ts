@@ -99,7 +99,7 @@ app.use(
   swaggerUi.serve,
   swaggerUi.setup(swaggerSpec, {
     customCss: ".swagger-ui .topbar { display: none }",
-    customSiteTitle: "MatchDB Shell Services — API Docs",
+    customSiteTitle: "MatchingDB Shell Services — API Docs",
   }),
 );
 

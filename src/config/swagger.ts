@@ -4,11 +4,11 @@ const options: swaggerJsdoc.Options = {
   definition: {
     openapi: "3.0.0",
     info: {
-      title: "MatchDB Shell Services API",
+      title: "MatchingDB Shell Services API",
       version: "1.0.0",
       description:
-        "Authentication & Payments API for the MatchDB platform. Handles user registration, login, Google OAuth, JWT token management, Stripe subscriptions, and candidate package purchases.",
-      contact: { name: "MatchDB Team" },
+        "Authentication & Payments API for the MatchingDB platform. Handles user registration, login, Google OAuth, JWT token management, Stripe subscriptions, and candidate package purchases.",
+      contact: { name: "MatchingDB Team" },
     },
     servers: [
       { url: "/api", description: "Default (relative)" },
