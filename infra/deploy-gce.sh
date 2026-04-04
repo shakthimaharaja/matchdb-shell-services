@@ -32,7 +32,7 @@ echo ">>> Creating shell-services environment..."
 cat > /opt/matchdb/matchdb-shell-services/.env << 'ENVEOF'
 PORT=8000
 NODE_ENV=production
-MONGO_URI=mongodb+srv://<USER>:<PASSWORD>@<CLUSTER>.mongodb.net/matchdb-shell?retryWrites=true&w=majority
+MONGO_URI=mongodb+srv://<USER>:<PASSWORD>@<CLUSTER>.mongodb.net/matchingdb-shell?retryWrites=true&w=majority
 JWT_SECRET=<PROD_JWT_SECRET_MIN_32_CHARS>
 JWT_REFRESH_SECRET=<PROD_JWT_REFRESH_SECRET_MIN_32_CHARS>
 JWT_ACCESS_EXPIRES=1h
@@ -54,7 +54,7 @@ echo ">>> Creating jobs-services environment..."
 cat > /opt/matchdb/matchdb-jobs-services/.env << 'ENVEOF'
 PORT=8001
 NODE_ENV=production
-MONGO_URI=mongodb+srv://<USER>:<PASSWORD>@<CLUSTER>.mongodb.net/matchdb-jobs?retryWrites=true&w=majority
+MONGO_URI=mongodb+srv://<USER>:<PASSWORD>@<CLUSTER>.mongodb.net/matchingdb-jobs?retryWrites=true&w=majority
 JWT_SECRET=<PROD_JWT_SECRET_MIN_32_CHARS>
 SENDGRID_API_KEY=
 SENDGRID_FROM_EMAIL=noreply@matchingdb.io

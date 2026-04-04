@@ -7,9 +7,9 @@ Each backend service connects to its own database within the same Atlas cluster.
 - **ODM:** Mongoose 8
 - **Cluster:** `matchingdb.mrumkpb.mongodb.net`
 - **Databases:**
-  - `matchdb-shell` � Auth, Users, Subscriptions, Payments (shell-services)
-  - `matchdb-jobs` — Jobs, Profiles, Applications, Companies, RBAC (jobs-services)
-  - `matchdb_data_collection` � Scraped job data (data-collection-mono)
+  - `matchingdb-shell` � Auth, Users, Subscriptions, Payments (shell-services)
+  - `matchingdb-jobs` — Jobs, Profiles, Applications, Companies, RBAC (jobs-services)
+  - `matchingdb_data_collection` � Scraped job data (data-collection-mono)
 - **ID strategy:** `_id: String` � generated via `new ObjectId().toString()`
 - **No Prisma, no PostgreSQL** � pure Mongoose schemas
 
@@ -18,19 +18,19 @@ Each backend service connects to its own database within the same Atlas cluster.
 ## Table of Contents
 
 1. [Architecture Overview](#architecture-overview)
-2. [Auth Domain � matchdb-shell (shell-services)](#auth-domain--matchdb-shell-shell-services)
+2. [Auth Domain � matchingdb-shell (shell-services)](#auth-domain--matchingdb-shell-shell-services)
    - [User](#user)
    - [Subscription](#subscription)
    - [RefreshToken](#refreshtoken)
    - [CandidatePayment](#candidatepayment)
-3. [Jobs Domain � matchdb-jobs (jobs-services)](#jobs-domain--matchdb-jobs-jobs-services)
+3. [Jobs Domain � matchingdb-jobs (jobs-services)](#jobs-domain--matchingdb-jobs-jobs-services)
    - [Job](#job)
    - [CandidateProfile](#candidateprofile)
    - [Application](#application)
    - [PokeRecord](#pokerecord)
    - [PokeLog](#pokelog)
    - [InterviewInvite](#interviewinvite)
-4. [Employer Domain — matchdb-jobs (jobs-services)](#employer-domain--matchdb-jobs-jobs-services)
+4. [Employer Domain — matchingdb-jobs (jobs-services)](#employer-domain--matchingdb-jobs-jobs-services)
    - [Company](#company)
    - [EmployerCandidate](#employercandidate)
    - [ForwardedOpening](#forwardedopening)
@@ -42,7 +42,7 @@ Each backend service connects to its own database within the same Atlas cluster.
    - [VendorCompany](#vendorcompany)
    - [SubscriptionPlan](#subscriptionplan)
    - [Counter](#counter)
-5. [Financials Domain � matchdb-jobs (jobs-services)](#financials-domain--matchdb-jobs-jobs-services)
+5. [Financials Domain � matchingdb-jobs (jobs-services)](#financials-domain--matchingdb-jobs-jobs-services)
    - [ProjectFinancial](#projectfinancial)
    - [Timesheet](#timesheet)
 6. [Indexes](#indexes)
@@ -59,7 +59,7 @@ Each backend service connects to its own database within the same Atlas cluster.
 �                   MongoDB Atlas Cluster                   �
 �              matchingdb.mrumkpb.mongodb.net                �
 +----------------------------------------------------------�
-� matchdb-shell  �  matchdb-jobs   � matchdb_data_collect  �
+� matchingdb-shell  �  matchingdb-jobs   � matchingdb_data_collect  �
 │  (4 models)    │  (20 models)    │  (Mongoose models)    │
 +----------------------------------------------------------+
         �                 �                    �
@@ -72,7 +72,7 @@ All queries use `.lean()` for plain JS objects.
 
 ---
 
-## Auth Domain � matchdb-shell (shell-services)
+## Auth Domain � matchingdb-shell (shell-services)
 
 ### User
 
@@ -144,7 +144,7 @@ All queries use `.lean()` for plain JS objects.
 
 ---
 
-## Jobs Domain � matchdb-jobs (jobs-services)
+## Jobs Domain � matchingdb-jobs (jobs-services)
 
 ### Job
 
@@ -298,7 +298,7 @@ All queries use `.lean()` for plain JS objects.
 
 ---
 
-## Marketer Domain � matchdb-jobs (jobs-services)
+## Marketer Domain � matchingdb-jobs (jobs-services)
 
 ### Company
 
@@ -518,7 +518,7 @@ Used by `getNextId()` to atomically generate IDs like `CND-0001`, `WKR-0042`, `C
 
 ---
 
-## Financials Domain � matchdb-jobs (jobs-services)
+## Financials Domain � matchingdb-jobs (jobs-services)
 
 ### ProjectFinancial
 
@@ -587,7 +587,7 @@ Used by `getNextId()` to atomically generate IDs like `CND-0001`, `WKR-0042`, `C
 
 All indexes are defined in the Mongoose schema files (not in migrations).
 
-### Shell Database (matchdb-shell)
+### Shell Database (matchingdb-shell)
 
 | Collection        | Index                     | Unique       |
 | ----------------- | ------------------------- | ------------ |
@@ -601,7 +601,7 @@ All indexes are defined in the Mongoose schema files (not in migrations).
 | candidatepayments | `{ stripeSessionId: 1 }`  | yes          |
 | candidatepayments | `{ userId: 1 }`           | no           |
 
-### Jobs Database (matchdb-jobs)
+### Jobs Database (matchingdb-jobs)
 
 | Collection          | Index                                            | Unique       |
 | ------------------- | ------------------------------------------------ | ------------ |
@@ -709,10 +709,10 @@ User._id --(1:N)--? Timesheet.candidateId
 
 | Environment | Shell Services                                  | Jobs Services                               |
 | ----------- | ----------------------------------------------- | ------------------------------------------- |
-| Local       | `mongodb+srv://...@matchdb.../matchdb-shell`    | `mongodb+srv://...@matchdb.../matchdb-jobs` |
-| Development | `mongodb+srv://...@matchdb.../matchdb-shell`    | `mongodb+srv://...@matchdb.../matchdb-jobs` |
-| QA          | `mongodb+srv://...@matchdb.../matchdb-shell-qa` | `mongodb+srv://...@matchdb.../matchdb-jobs` |
-| Production  | `mongodb+srv://...@matchdb.../matchdb-shell`    | `mongodb+srv://...@matchdb.../matchdb-jobs` |
+| Local       | `mongodb+srv://...@matchdb.../matchingdb-shell`    | `mongodb+srv://...@matchdb.../matchingdb-jobs` |
+| Development | `mongodb+srv://...@matchdb.../matchingdb-shell`    | `mongodb+srv://...@matchdb.../matchingdb-jobs` |
+| QA          | `mongodb+srv://...@matchdb.../matchingdb-shell-qa` | `mongodb+srv://...@matchdb.../matchingdb-jobs` |
+| Production  | `mongodb+srv://...@matchdb.../matchingdb-shell`    | `mongodb+srv://...@matchdb.../matchingdb-jobs` |
 
 All environments connect to the same MongoDB Atlas cluster.
 Connection strings are stored in `env/.env.{NODE_ENV}` files within each service.

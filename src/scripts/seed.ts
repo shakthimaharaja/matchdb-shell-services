@@ -82,7 +82,7 @@ const oid = () => new mongoose.Types.ObjectId().toString();
 
 async function seed() {
   await connectMongo();
-  console.log("🌱 Seeding matchdb-shell database...\n");
+  console.log("🌱 Seeding matchingdb-shell database...\n");
 
   // Drop and recreate collections to clear stale indexes
   const db = mongoose.connection.db!;

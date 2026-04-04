@@ -180,7 +180,7 @@ const BULK: [string, string, string, string, string, boolean][] = [
 
 async function seedBulk() {
   await connectMongo();
-  console.log("🌱 Bulk-seeding 20 extra candidates into matchdb-shell...\n");
+  console.log("🌱 Bulk-seeding 20 extra candidates into matchingdb-shell...\n");
 
   const testHash = await bcrypt.hash(TEST_PW, 12);
   const oneYear = new Date(Date.now() + 365 * 86_400_000);

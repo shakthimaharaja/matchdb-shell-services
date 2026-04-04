@@ -82,7 +82,7 @@ MatchingDB is a **micro-frontend (MFE)** workforce management platform built wit
 │                              ▼                      ▼                   │
 │                    ┌──────────────────┐   ┌──────────────────┐          │
 │                    │  MongoDB Atlas   │   │  MongoDB Atlas   │          │
-│                    │  matchdb-shell   │   │  matchdb-jobs    │          │
+│                    │  matchingdb-shell│   │  matchingdb-jobs │          │
 │                    │  (4 collections) │   │  (20 collections)│          │
 │                    └──────────────────┘   └──────────────────┘          │
 │                                                                         │
@@ -467,8 +467,8 @@ MongoDB Atlas cluster: `matchingdb.mrumkpb.mongodb.net`
 
 | Database                  | Service         | Collections | Purpose                                                                                            |
 | ------------------------- | --------------- | ----------- | -------------------------------------------------------------------------------------------------- |
-| `matchdb-shell`           | shell-services  | 4           | Users, Subscriptions, RefreshTokens, CandidatePayments                                             |
-| `matchdb-jobs`            | jobs-services   | 20          | Jobs, Profiles, Applications, Companies, Financials, Timesheets, Invoices, Bills, Interviews, etc. |
+| `matchingdb-shell`           | shell-services  | 4           | Users, Subscriptions, RefreshTokens, CandidatePayments                                             |
+| `matchingdb-jobs`            | jobs-services   | 20          | Jobs, Profiles, Applications, Companies, Financials, Timesheets, Invoices, Bills, Interviews, etc. |
 | `matchdb_data_collection` | data-collection | varies      | Scraped/ingested job data                                                                          |
 
 All models use `_id: String` (generated via `new ObjectId().toString()`). No `populate()` — relationships resolved via separate queries + Map lookups. All queries use `.lean()`.

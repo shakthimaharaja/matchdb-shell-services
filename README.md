@@ -46,7 +46,7 @@ The server starts on **http://localhost:8000**.
 
 ### Seed Data
 
-`npm run seed` populates the `matchdb-shell` database with:
+`npm run seed` populates the `matchingdb-shell` database with:
 
 - **15 users** — 3 admin accounts, 10 candidates, 2 vendors
 - **15 subscriptions** — one per user (pro_plus, marketer, pro, basic, free)
@@ -138,7 +138,7 @@ matchdb-shell-services/
 
 ## Database (MongoDB Atlas)
 
-This service connects to the `matchdb-shell` database on MongoDB Atlas.
+This service connects to the `matchingdb-shell` database on MongoDB Atlas.
 Schemas are defined as Mongoose models — no migrations needed.
 
 ### Collections (4 models)
