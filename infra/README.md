@@ -465,11 +465,11 @@ Seeded by `npm run seed`.
 
 MongoDB Atlas cluster: `matchingdb.mrumkpb.mongodb.net`
 
-| Database                  | Service         | Collections | Purpose                                                                                            |
-| ------------------------- | --------------- | ----------- | -------------------------------------------------------------------------------------------------- |
-| `matchingdb-shell`        | shell-services  | 4           | Users, Subscriptions, RefreshTokens, CandidatePayments                                             |
-| `matchingdb-jobs`         | jobs-services   | 20          | Jobs, Profiles, Applications, Companies, Financials, Timesheets, Invoices, Bills, Interviews, etc. |
-| `matchingdb_data_collection` | data-collection | varies      | Scraped/ingested job data                                                                       |
+| Database                     | Service         | Collections | Purpose                                                                                            |
+| ---------------------------- | --------------- | ----------- | -------------------------------------------------------------------------------------------------- |
+| `matchingdb-shell`           | shell-services  | 4           | Users, Subscriptions, RefreshTokens, CandidatePayments                                             |
+| `matchingdb-jobs`            | jobs-services   | 20          | Jobs, Profiles, Applications, Companies, Financials, Timesheets, Invoices, Bills, Interviews, etc. |
+| `matchingdb_data_collection` | data-collection | varies      | Scraped/ingested job data                                                                          |
 
 All models use `_id: String` (generated via `new ObjectId().toString()`). No `populate()` — relationships resolved via separate queries + Map lookups. All queries use `.lean()`.
 
